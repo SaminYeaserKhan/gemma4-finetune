@@ -1,0 +1,4 @@
+| name | file | total | correct | accuracy | avg_prompt_tokens | avg_gen_tokens | avg_total_tokens | supervisor_accept_rate | avg_attempts |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| baseline | outputs\predictions\baseline_gsm8k_test.jsonl | 1319 | 479 | 0.3632 | 1617.7 | 120.6 | 1738.3 |  |  |
+| fine_tuned | outputs\predictions\fine_tuned_gsm8k_test.jsonl | 1319 | 737 | 0.5588 | 87.7 | 125.9 | 213.5 |  |  |
