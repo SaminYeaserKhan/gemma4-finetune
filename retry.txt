@@ -1,0 +1,6 @@
+ # 1. Count how many examples were saved before the outage
+  $offset = (Get-Content outputs\predictions\baseline_gsm8k_test.jsonl | Measure-Object -Line).Lines
+  echo "Resuming from example $offset"
+
+  # 2. Resume from where it stopped
+  python generate.py --run-name baseline --offset $offset
