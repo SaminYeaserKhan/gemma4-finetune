@@ -13,13 +13,6 @@ Hugging face tokken.txt
 *token*.txt
 *tokken*.txt
 
-# Generated data and model artifacts
-gsm8k_formatted/
-checkpoints/
-checkpoints_old_prompt_training/
-gemma4-gsm8k-final/
-outputs/
-reports/
 
 # Hugging Face / Python caches
 .cache/
