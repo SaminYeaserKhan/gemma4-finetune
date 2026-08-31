@@ -1,0 +1,46 @@
+{
+  "questions_timed": 40,
+  "gpu_note": "measured on an RTX 4080 SUPER; weak hardware is slower",
+  "model_load_seconds": 9.48,
+  "checker_model": "Qwen3.5-9B-UD-Q4_K_XL",
+  "components": [
+    {
+      "what": "local generation (1 answer)",
+      "n": 40,
+      "mean": 15.123425000000001,
+      "median": 13.57000000000005,
+      "p90": 22.937999999999988,
+      "min": 6.187999999999988,
+      "max": 53.65600000000006
+    },
+    {
+      "what": "tokens per answer",
+      "n": 40,
+      "mean": 133.475,
+      "median": 114.0,
+      "p90": 201.0,
+      "min": 51.0,
+      "max": 512.0
+    },
+    {
+      "what": "checker judgement (1 answer)",
+      "n": 40,
+      "mean": 0.9961000000000013,
+      "median": 1.0004999999999882,
+      "p90": 2.0160000000000764,
+      "min": 0.23499999999989996,
+      "max": 2.0629999999998745
+    }
+  ],
+  "local_tokens_per_second": 8.825712429558779,
+  "assumptions": {
+    "samples": 3,
+    "escalation_rate": 0.3,
+    "rejection_rate": 0.8383838383838383
+  },
+  "profile": {
+    "seconds_local_path": 45.37027500000001,
+    "seconds_escalated_path": 59.045610101010105,
+    "seconds_average": 49.47287553030303
+  }
+}

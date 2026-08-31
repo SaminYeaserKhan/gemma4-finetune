@@ -1,0 +1,5 @@
+condition,correct,total,accuracy,cloud_tokens_per_q
+local only (1 sample),737,1319,0.5588,0.0
+"blind retry, take last",658,1319,0.4989,0.0
+self-consistency@3 (majority),779,1319,0.5906,0.0
+pass@3 CEILING,962,1319,0.7293,0.0

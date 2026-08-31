@@ -12,4 +12,4 @@ torchvision==0.21.0+cu124
 tqdm==4.67.3
 transformers==5.8.1
 trl==1.4.0
-
+matplotlib==3.11.1

@@ -16,6 +16,108 @@ class GenerationResult(NamedTuple):
     prompt_tokens: int
 
 
+class ConfidenceResult(NamedTuple):
+    """Three ways of reading the same forward pass.
+
+    Which one predicts errors best is an empirical question, so all three are
+    recorded -- they cost nothing extra once the pass has been run.
+
+    mean_logprob   average over every answer token. Length-normalised, so it
+                   partly re-measures the length gate.
+    min_logprob    the single least-likely token: the weakest link. Not
+                   length-normalised, and insensitive to a long confident
+                   preamble around one bad step.
+    final_logprob  average over the tokens of the final answer alone. The
+                   thesis metric only grades that number, so this is the most
+                   directly relevant span -- and the narrowest.
+    """
+
+    mean_logprob: float
+    min_logprob: float
+    final_logprob: float | None
+    scored_tokens: int
+
+
+def token_logprobs(logits, input_ids, start: int) -> list[float]:
+    """Log-probability the model assigned to each token from `start` onward.
+
+    A causal LM's logits at position i are its prediction for position i+1, so
+    the score for `input_ids[i]` is read from `logits[i-1]`. That shift is the
+    only subtle thing here and it fails silently if dropped -- you still get a
+    full set of negative numbers, just for the wrong tokens.
+
+    Scoring an already-written answer this way takes a single forward pass
+    instead of a token-by-token generation loop, which is what makes the
+    confidence gate cheap enough to add after the fact.
+    """
+    if start < 1:
+        raise ValueError(f"start must be >= 1; nothing precedes token 0 (got {start})")
+    # log_softmax over the vocabulary, in float32: the bf16 compute dtype has
+    # ~3 decimal digits of mantissa, which is coarse for values summed over
+    # hundreds of tokens.
+    log_probs = torch.log_softmax(logits[0, start - 1 : -1].float(), dim=-1)
+    targets = input_ids[0, start:]
+    picked = log_probs.gather(-1, targets.unsqueeze(-1)).squeeze(-1)
+    return [float(value) for value in picked]
+
+
+def answer_confidence(
+    model,
+    tokenizer,
+    prompt: str,
+    answer: str,
+    final_char_offset: int | None = None,
+) -> ConfidenceResult:
+    """Score an already-written answer in one forward pass.
+
+    `final_char_offset` is an index into `answer` marking where the final
+    answer begins; tokens from there on are averaged separately. Passed in
+    rather than detected here so this stays independent of GSM8K's `####`
+    convention.
+
+    Note this returns the model's raw probabilities, not the ones that drove
+    sampling: `generate_answer` applies a repetition penalty, which distorts
+    the distribution to shape output. The unpenalised value is the one that
+    means "how sure was the model", so it is the right one for a gate.
+    """
+    prompt_ids = tokenizer(prompt, return_tensors="pt")["input_ids"]
+    start = int(prompt_ids.shape[-1])
+    encoded = tokenizer(prompt + answer, return_tensors="pt", return_offsets_mapping=True)
+    input_ids = encoded["input_ids"]
+
+    # Re-tokenising prompt+answer can merge across the join, which would shift
+    # every index by one and silently score the wrong span. The prompt ends on
+    # a newline so this should never fire; it is checked because the failure is
+    # invisible in the output.
+    if not torch.equal(input_ids[0, :start], prompt_ids[0]):
+        raise ValueError("tokenising prompt+answer did not preserve the prompt prefix")
+    if input_ids.shape[-1] <= start:
+        raise ValueError("answer contributed no tokens to score")
+
+    with torch.no_grad():
+        logits = model(input_ids=input_ids.to(model.device)).logits
+    scores = token_logprobs(logits.cpu(), input_ids, start)
+
+    final_logprob = None
+    if final_char_offset is not None:
+        boundary = len(prompt) + final_char_offset
+        offsets = encoded["offset_mapping"][0][start:]
+        tail = [
+            score
+            for score, (begin, _) in zip(scores, offsets.tolist())
+            if begin >= boundary
+        ]
+        if tail:
+            final_logprob = sum(tail) / len(tail)
+
+    return ConfidenceResult(
+        mean_logprob=sum(scores) / len(scores),
+        min_logprob=min(scores),
+        final_logprob=final_logprob,
+        scored_tokens=len(scores),
+    )
+
+
 class _MultiTokenStop(StoppingCriteria):
     """Stops generation when the tail of generated tokens matches stop_seq."""
     def __init__(self, stop_seq: list[int]):
@@ -61,6 +163,66 @@ def load_inference_model(cfg: ThesisConfig, adapter_dir: str | Path | None = Non
         model = PeftModel.from_pretrained(model, str(adapter_dir))
     model.eval()
     return model
+
+
+def load_causal_lm(model_name: str):
+    """Load a generic instruct model in 4-bit, for use as a local supervisor.
+
+    Separate from `load_base_model` because Gemma 4 is multimodal and needs
+    `AutoModelForImageTextToText`, while a text-only verifier (Qwen, Llama,
+    Mistral) needs `AutoModelForCausalLM`.
+    """
+    from transformers import AutoModelForCausalLM
+
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        quantization_config=quantization_config(),
+        device_map="auto",
+    )
+    model.config.use_cache = True
+    model.eval()
+    return model
+
+
+def generate_chat(
+    model,
+    tokenizer,
+    system_prompt: str,
+    user_prompt: str,
+    max_new_tokens: int,
+    temperature: float = 0.0,
+) -> GenerationResult:
+    """Single-turn chat completion via the model's own chat template.
+
+    Used for the local/self supervisor, where the verifier may be any instruct
+    model rather than Gemma, so the hand-rolled `<start_of_turn>` tags in
+    `gsm8k.build_prompt` do not apply.
+    """
+    messages = [{"role": "user", "content": f"{system_prompt}\n\n{user_prompt}"}]
+    try:
+        text = tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+    except Exception:  # tokenizer without a chat template
+        text = f"{system_prompt}\n\n{user_prompt}\n"
+    inputs = tokenizer(text, return_tensors="pt").to(model.device)
+    prompt_tokens = int(inputs["input_ids"].shape[-1])
+    kwargs = {
+        "max_new_tokens": max_new_tokens,
+        "do_sample": temperature > 0,
+        "pad_token_id": tokenizer.pad_token_id,
+    }
+    if temperature > 0:
+        kwargs["temperature"] = temperature
+    with torch.no_grad():
+        output_ids = model.generate(**inputs, **kwargs)
+    generated_ids = output_ids[0][inputs["input_ids"].shape[-1] :]
+    decoded = tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
+    return GenerationResult(
+        text=decoded,
+        tokens_generated=int(generated_ids.shape[-1]),
+        prompt_tokens=prompt_tokens,
+    )
 
 
 def generate_answer(

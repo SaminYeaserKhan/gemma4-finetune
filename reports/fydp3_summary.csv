@@ -1,0 +1,17 @@
+condition,correct,total,accuracy,cloud_tokens_per_q,escalation_rate,supervisor_calls,local_tokens_per_q,avg_attempts,supervisor_errors
+local only (1 sample),737,1319,0.5588,0.0,,,,,
+"blind retry, take last",658,1319,0.4989,0.0,,,,,
+self-consistency@3 (majority),779,1319,0.5906,0.0,,,,,
+pass@3 CEILING,962,1319,0.7293,0.0,,,,,
+hint-none,756,1319,0.5732,300.9,0.3002,712,436.6,1.46,0
+hint-none + voting,798,1319,0.6050,300.9,0.3002,712,436.6,1.46,0
+hint-short,765,1319,0.5800,297.9,0.3002,712,436.8,1.46,0
+hint-short + voting,807,1319,0.6118,297.9,0.3002,712,436.8,1.46,0
+hint-full,784,1319,0.5944,296.0,0.3002,712,442.0,1.45,0
+hint-full + voting,826,1319,0.6262,296.0,0.3002,712,442.0,1.45,0
+more-escalation,801,1319,0.6073,369.0,0.3730,889,497.1,1.57,0
+more-escalation + voting,843,1319,0.6391,369.0,0.3730,889,497.1,1.57,0
+smart-gate,795,1319,0.6027,307.5,0.3002,728,459.6,1.48,0
+smart-gate + voting,837,1319,0.6346,307.5,0.3002,728,459.6,1.48,0
+BEST-qwen9b,861,1319,0.6528,345.8,0.3002,728,467.6,1.44,18
+BEST-qwen9b + voting,903,1319,0.6846,345.8,0.3002,728,467.6,1.44,18

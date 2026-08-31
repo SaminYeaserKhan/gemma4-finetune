@@ -37,6 +37,44 @@ def build_fewshot_prompt(question: str, shots: list[tuple[str, str]]) -> str:
     return prefix + build_prompt(question)
 
 
+def build_retry_prompt(
+    question: str,
+    previous_answer: str,
+    level: int,
+    hint: str | None = None,
+) -> str:
+    """Prompt for a second attempt after the supervisor rejected the first.
+
+    `level` is the amount of feedback the supervisor is allowed to send back,
+    which is also its cloud token cost -- the axis this thesis measures:
+
+    - 0: the bare rejection, no diagnostic information at all.
+    - 1: plus a pointer naming the step that went wrong.
+    - 2: plus a correction stating the right interpretation.
+
+    A level 2 hint still never contains the final answer; the small model has
+    to do the arithmetic itself, otherwise the supervisor is solving the
+    problem and the cascade proves nothing.
+
+    Kept deliberately terse: the adapter was fine-tuned on bare questions, so
+    every extra instruction word pushes the prompt further out of distribution.
+    """
+    if level not in (0, 1, 2):
+        raise ValueError(f"feedback level must be 0, 1 or 2, got {level}")
+    lines = [
+        question.strip(),
+        "",
+        "Previous attempt:",
+        previous_answer.strip(),
+        "",
+        "A verifier rejected that attempt.",
+    ]
+    if level > 0 and hint and hint.strip():
+        lines.append(hint.strip())
+    lines.append("Solve the problem again and finish with `#### <final answer>`.")
+    return build_prompt("\n".join(lines))
+
+
 def format_gsm8k_example(example: dict[str, Any]) -> dict[str, str]:
     question = example["question"]
     answer = example["answer"]
