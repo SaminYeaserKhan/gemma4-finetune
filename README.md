@@ -1,4 +1,13 @@
-# Gemma 4 GSM8K Hallucination-Reduction Thesis Pipeline
+# Answer Locally, Verify Rarely
+
+**An edge-constrained supervised cascade for grade-school maths.** A 2-billion-parameter
+model, fine-tuned with QLoRA, writes every answer on the device. A larger verifier is
+consulted about only the ~30% of questions the device itself judges hardest, and is never
+shown the correct answer.
+
+**36.32% → 55.88% → 68.46%** exact-answer accuracy on the complete GSM8K test set
+(1,319 questions): the untrained base model, the same model after fine-tuning, and the
+full cascade. Every model, verifier included, runs locally — no cloud service was used.
 
 > **New here, or writing the thesis paper?** Start with
 > **[`docs/PAPER_GUIDE.md`](docs/PAPER_GUIDE.md)** — what was built, every result and
@@ -6,7 +15,15 @@
 > plain language. `outputs/predictions/README.md` explains the data files.
 
 
-This project fine-tunes `google/gemma-4-E2B-it` on GSM8K with QLoRA, evaluates exact final-answer accuracy, and optionally runs a hybrid supervisor retry loop with OpenAI or Anthropic as the binary verifier.
+This project fine-tunes `google/gemma-4-E2B-it` on GSM8K with QLoRA, evaluates exact
+final-answer accuracy, and runs a supervised retry cascade: an on-device gate picks which
+questions to escalate, a verifier judges the reasoning without seeing the answer key, and
+the small model retries with a short hint. The reported results use a self-hosted verifier
+served as GGUF through `llama-server`; OpenAI, Anthropic and Gemini remain supported as
+optional providers but were not used for any headline number.
+
+**[`docs/experiments/`](docs/experiments/README.md) has one folder per system tested** —
+19 of them, each with two diagrams and its own measured costs — plus the combined benchmark.
 
 ## Repository Layout
 
@@ -17,7 +34,11 @@ This project fine-tunes `google/gemma-4-E2B-it` on GSM8K with QLoRA, evaluates e
 - `supervise.py`: runs supervised retry evaluation with up to two retries by default.
 - `thesis_pipeline/`: shared config, prompt formatting, answer extraction, model loading, and supervisor clients.
 
-Generated artifacts are ignored by git: `venv/`, `gsm8k_formatted/`, `checkpoints/`, `gemma4-gsm8k-final/`, `outputs/`, and `reports/`.
+Ignored by git: `venv/`, `gsm8k_formatted/`, `checkpoints/`, and `gemma4-gsm8k-final/` —
+the environment, the formatted dataset and the model weights, all reproducible from the
+scripts. **Results are committed**: `outputs/predictions/` holds every prediction file and
+`reports/` the tables and figures, so the numbers can be checked without re-running
+anything.
 
 ## Setup
 

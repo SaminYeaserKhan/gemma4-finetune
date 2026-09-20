@@ -51,7 +51,7 @@ retry with a hint.
 | `13_pipeline_glm30b_hint_full_more_escalation.jsonl` | Same, but sends more questions to the checker (37% instead of 30%). |
 | `14_pipeline_glm30b_hint_full_smart_gate.jsonl` | Same, but chooses *which* questions to send using confidence as well as disagreement. |
 | `15_pipeline_qwen9b_BEST_RESULT.jsonl` | **The headline result: 68.5% correct.** Same as file 14 but with the Qwen 9B checker instead of the 30B one. |
-| `16_pipeline_glm30b_no_gate_every_question.jsonl` | Sends **every** question to the checker. A cost comparison, not a proposal. |
+| `16_pipeline_glm30b_no_gate_every_question.jsonl` | **Despite its name, not a full pipeline.** The GLM 30B checker marks every first answer, and nothing is retried (every row has one attempt; the score stays 737). It is the GLM equivalent of file `08_`: it measures how good the checker is. Kept under this name because other files refer to it. |
 
 "GLM 30B" and "Qwen 9B" are the two checker models. "Hint" is how much guidance the
 checker is allowed to send back.

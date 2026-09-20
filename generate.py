@@ -13,6 +13,7 @@ from thesis_pipeline.gsm8k import (
     answers_match,
     build_fewshot_prompt,
     build_prompt,
+    family_for,
     extract_final_answer,
 )
 from thesis_pipeline.io_utils import append_jsonl, read_jsonl
@@ -48,6 +49,10 @@ def main() -> None:
     cfg = ThesisConfig()
     if args.model_name:
         cfg = ThesisConfig(**{**cfg.__dict__, "model_name": args.model_name})
+    # Chat tags and stop token follow the base model, not the pipeline. A
+    # mismatch here does not crash -- it produces a fluent, parseable,
+    # meaningless run -- so it is resolved once, up front, and threaded down.
+    family = family_for(cfg.model_name)
     dataset_dir = Path(args.dataset_dir) if args.dataset_dir else cfg.dataset_dir
     adapter_dir = Path(args.adapter_dir) if args.adapter_dir else None
     run_name = args.run_name or ("fine_tuned" if adapter_dir else "baseline")
@@ -74,9 +79,10 @@ def main() -> None:
             result = generate_answer(
                 model=model,
                 tokenizer=tokenizer,
-                prompt=build_prompt(question),
+                prompt=build_prompt(question, family),
                 max_new_tokens=max_new_tokens,
                 temperature=args.temperature,
+                family=family,
             )
             append_jsonl(
                 output,
@@ -124,13 +130,18 @@ def main() -> None:
     for local_idx, row in enumerate(tqdm(rows, desc=f"Generating {run_name}")):
         example_id = args.offset + local_idx
         question = row["question"]
-        prompt = build_fewshot_prompt(question, shots) if shots else build_prompt(question)
+        prompt = (
+            build_fewshot_prompt(question, shots, family)
+            if shots
+            else build_prompt(question, family)
+        )
         result = generate_answer(
             model=model,
             tokenizer=tokenizer,
             prompt=prompt,
             max_new_tokens=max_new_tokens,
             temperature=args.temperature,
+            family=family,
         )
         gold_final = row.get("final_answer") or extract_final_answer(row["answer"])
         pred_final = extract_final_answer(result.text)

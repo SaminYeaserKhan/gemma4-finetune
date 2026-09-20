@@ -84,18 +84,23 @@ twice with randomness switched on so it explores different approaches.
 
 **Step 3 — If there is a majority, take it.** When all three agree, or when two of
 three agree, we keep that answer and stop. Nothing leaves the device. That covers
-**923 of 1,319 questions (70%)**.
+**827 of 1,319 questions (63%)**.
 
 **Step 4 — If all three differ, consider sending it up.** There is no majority to
 take, so the model has genuinely failed to settle. We rank these by how uncertain
-the model was and send the **396** least confident to the checker.
+the model was and send the **396** least confident to the checker. The other **96**
+keep their first attempt, because we only allow 30% of questions to be sent. So in
+total **923 of 1,319 questions (70%) never leave the device** — 827 with a majority,
+plus these 96.
 
 **Step 5 — The checker marks the answer.** It sees the question and the model's
 working — but **never the correct answer**. It replies with a verdict and, if it
 rejects, one sentence naming the first wrong step and one sentence explaining the
 right reading. It rejected **332 of the 396**.
 
-**Step 6 — The model tries again with the hint.** Its new answer is final.
+**Step 6 — The model tries again with the hint.** The checker looks once more: it
+accepted **85** of the second attempts. For the other **247**, the model gets one
+last try, which is kept without a further check.
 
 ### Why steps 3 and 5 are both needed
 
@@ -121,13 +126,19 @@ question-by-question rather than average-against-average.
 
 ### 4.1 Fine-tuning worked (RQ1)
 
-| Condition | Correct | Accuracy | Words generated per question |
-|---|---|---|---|
-| Untrained model, shown 8 worked examples first | 479 | **36.32%** | 1,738 |
-| After our fine-tuning, shown nothing | 737 | **55.88%** | 214 |
+| Condition | Correct | Accuracy | Tokens read | Tokens written | Total tokens |
+|---|---|---|---|---|---|
+| Untrained model, shown 8 worked examples first | 479 | **36.32%** | 1,617.7 | 120.6 | 1,738.3 |
+| After our fine-tuning, shown nothing | 737 | **55.88%** | 87.7 | 125.9 | 213.5 |
 
-**Plus 19.6 percentage points.** The model also became **8x more concise**, because
-it learned the answer format instead of needing to be shown it every time.
+**Plus 19.6 percentage points**, and **8x fewer tokens in total per question.**
+
+Be precise about *where* that saving comes from, because it is easy to get wrong.
+The fine-tuned model does **not** write shorter answers — it writes about the same
+amount (125.9 tokens against 120.6). The saving is almost entirely in what it has to
+**read**: the untrained model needs 8 solved examples in front of every question to
+understand the format, and the trained model does not. Say "8x fewer tokens per
+question", never "8x more concise".
 
 > **Why "shown 8 worked examples"?** Without examples the untrained model does not
 > understand the task at all and scores near zero. Comparing against that would
@@ -427,9 +438,31 @@ constraint honestly — **time to answer** and **data leaving the device**, not
 electricity. Give the headline: 36.3% to 55.9% to 68.5%.
 
 ### Related work
-Cover parameter-efficient fine-tuning (QLoRA), self-consistency and majority
-voting, model cascades and routing, and LLM-as-a-judge with its known biases. Our
-contribution sits at the join of the last three.
+**Write this section from [`RELATED_WORK.md`](RELATED_WORK.md).** It has 20 papers
+grouped by theme, each with a plain-language summary, the one sentence to put in
+our paper, and how we differ. Citations are ready to paste from
+[`references.bib`](references.bib).
+
+The six groups, in the order they should appear:
+
+1. **Making a small model good at maths** — GSM8K and the original verifier idea
+   (Cobbe et al., 2021), chain-of-thought (Wei et al., 2022), LoRA and QLoRA.
+2. **Getting more from one model at answer time** — self-consistency
+   (Wang et al., 2023). *This is the most important citation in the thesis*, because
+   it is the free baseline our whole story turns on.
+3. **Cascades and routing** — FrugalGPT (Chen et al., 2023) is the family we belong
+   to; Gupta et al. (2024) is the closest work to our gate.
+4. **One model checking another** — LLM-as-a-judge and its biases (Zheng et al.,
+   2023), which *predict* our 2B self-check failure rather than being surprised by it.
+5. **The negative results that justify our design** — Huang et al. (2024) on why
+   self-correction fails, and Zhang et al. (2024), the closest published work to our
+   verifier-ladder question.
+6. **Running models on ordinary hardware** — the surveys, plus the concurrent
+   Qualcomm work (Bondarenko et al., 2026) that we should address head-on.
+
+`RELATED_WORK.md` also carries the honest novelty table (what is ours, what is not)
+and five literature questions an examiner is likely to ask. Read those before the
+defence.
 
 ### Method
 Describe the six steps in §3. Include a pipeline diagram. Make these explicit,
@@ -604,6 +637,10 @@ numbers in this document are labelled as such (§8.6).
 |---|---|
 | **This guide** | `docs/PAPER_GUIDE.md` |
 | Technical record, every number with its source | `docs/THESIS_DOSSIER.md` |
+| Literature review: 20 related papers, explained | `docs/RELATED_WORK.md` |
+| **Every experiment, one folder each: diagrams + full benchmark table** | `docs/experiments/README.md` |
+| The same benchmark as an Excel file, every column explained | `reports/benchmark_all_systems.xlsx` |
+| Citations ready to paste | `docs/references.bib` |
 | How to re-run everything from scratch | `REPRODUCE.md` |
 | The headline figure | `reports/figures/pareto.png` |
 | Main results table | `reports/fydp3_summary.md` |

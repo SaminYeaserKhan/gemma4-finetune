@@ -5,6 +5,10 @@
 > report, and the questions to expect at the defence. This document is the
 > technical record: it exists so every number can be traced to the file and
 > command that produced it. Use it to check a figure, not to learn the project.
+>
+> **Prior work lives in `docs/RELATED_WORK.md`**, with `docs/references.bib` for
+> the citations. This file deliberately holds only our own measurements; when a
+> result here needs positioning against published work, that file does it.
 
 
 **Living document. Last updated: 2026-08-29.**
@@ -1038,6 +1042,105 @@ slower still, which moves the balance *further* towards local cost and makes the
 0.6% cloud share smaller, not larger. A genuine edge measurement needs the
 benchmark run on such a device; it requires only the solver, not the checker.
 
+### 5.10 Does the gate transfer to a different solver? — DESIGNED, NOT RUN (decision 2026-09-11)
+
+> **Status: deferred by the user on 2026-09-11, to be run only if the supervisor
+> asks for it.** The design below is complete and the code is written, tested and
+> committed, so it can be executed later with one command. **No result exists, and
+> none is claimed anywhere in this thesis.** The corresponding limitation is stated
+> in §8.9 — a single-solver evaluation — which is how the thesis handles this gap.
+>
+> A partial file of 51 generated answers exists at
+> `outputs/predictions/17_qwen15b_answers_try1.jsonl`. It is 3.9% of the test set,
+> its confidence interval spans roughly 45%-72%, and **it must not be quoted as a
+> result** in any form. It is kept only as a resume point.
+
+**The gap this would close.** Every number above comes from one solver. A reviewer can
+fairly say the gate might be exploiting a quirk of `gemma-4-E2B-it` rather than a
+general property of sampled reasoning, and nothing measured so far can refute that.
+The literature search (`docs/RELATED_WORK.md` §G2) sharpened this into a concrete
+threat: **Qwen2.5-1.5B-Instruct is reported at 73.2% on GSM8K** (4-shot, official
+Qwen2.5 Technical Report, arXiv:2412.15115) — a *smaller* model, with no
+fine-tuning, no voting and no checker, above our full 68.46% cascade.
+
+**Design, if it is ever run.** Run the identical pipeline with `Qwen/Qwen2.5-1.5B-Instruct` as the
+solver, keeping the Qwen3.5-9B checker, the combined gate, and the 30% escalation
+rate fixed. Two questions, one run:
+
+1. What does that model actually score on **our** harness — 4-bit NF4, strict
+   `#### N` extraction with last-number fallback, the full 1,319-question test set?
+   The published figure uses a different protocol and is not comparable.
+2. Do the disagreement gate, the confidence tie-break and the stacking result
+   reproduce on a solver nothing in this project was tuned against?
+
+**The solver is used stock — no fine-tuning, no adapter.** Deliberate: the claim
+under test is about the routing mechanism, not about training, and leaving the
+solver untouched removes any suspicion that the gate was co-tuned with it.
+
+#### 5.10.1 Protocol decisions, and why they differ from the Gemma arm
+
+**Zero-shot, not 8-shot. Measured, not assumed.** On an 8-question smoke test the
+8-shot completion-style prompt used for the Gemma baseline scored 3/8 and produced
+one degenerate answer — 512 tokens of a single repeated digit — while zero-shot
+scored 3/5 with coherent, extractable reasoning. Qwen2.5-Instruct is a chat model
+and few-shot completion prompting takes it out of distribution. This is consistent
+with arXiv:2604.07035, which found GSM8K the most prompt-sensitive of its four
+benchmarks, with a 0.560 spread between strategies on a single model.
+
+*Consequence for reporting:* the Qwen arm is zero-shot and the Gemma baseline is
+8-shot, so **the two base-model numbers are not a like-for-like comparison and must
+never be presented as one.** Within the Qwen arm every condition is zero-shot, which
+is what the transfer claim needs.
+
+**Token budget raised to 768** (default 512). Zero-shot Qwen is verbose — one smoke
+answer reached 502 tokens — and truncating its reasoning would understate it. The
+Gemma arm keeps 512; this is a per-arm setting, recorded here because it is a
+difference between arms.
+
+#### 5.10.2 Code changes this required
+
+Multi-solver support did not exist; the pipeline was Gemma-only in three places.
+Added under test (`tests/test_model_family.py`, 21 new cases, suite 138 -> 159):
+
+- `gsm8k.ModelFamily` / `family_for()` — chat tags and loader class travel together,
+  because they are two faces of one fact. An unregistered model **raises** rather
+  than defaulting: the wrong chat template does not crash, it yields a fluent,
+  parseable, meaningless run, which is far more expensive to discover than an error.
+- `model_utils.trim_at_end_tag()` — the stop marker is family-specific. Left in
+  place, `<|im_end|>` would sit inside the stored prediction where the last-number
+  fallback in `extract_final_answer` could read digits out of trailing chatter.
+- `supervise.resolve_adapter_dir()` + `--no-adapter` — an empty `--adapter-dir`
+  falls through to the configured *Gemma* adapter, so evaluating another base model
+  needed a way to say "no adapter" that cannot be read as "not specified".
+
+Defaults are unchanged throughout and pinned by a regression test, so every
+existing Gemma result reproduces byte-identically.
+
+#### 5.10.3 Results — NONE. The run was not performed.
+
+There is no results table because there are no results. The run was stopped after
+51 of 1,319 questions and deliberately not resumed.
+
+Cost if it is resumed later: ~14.4 h of generation (measured at 13.07 s/question,
+3 samples x 1,319), ~1 h confidence scoring, ~1.5 h for the cascade.
+
+Reproduce with `scripts/run_qwen_solver_arm.ps1`, then the cascade command it
+prints. Outputs are `outputs/predictions/17_`–`23_qwen15b_*`. Log:
+`reports/qwen_solver_arm.log`.
+
+**Pre-registered interpretation, written before the run was stopped and kept here
+unchanged.** If this is ever executed, these readings stand as written; they were not
+authored with any result in view:
+
+- *Gate AUC holds near 0.84–0.87 and stacking still wins* → the mechanism is a
+  property of sampled reasoning, not of Gemma. This is the result that closes §G2.
+- *Gate AUC collapses* → the gate was exploiting something specific to our
+  fine-tuned solver, and the thesis must say so. That is a real finding and gets
+  reported either way.
+- *Qwen scores far below 73.2% on our harness* → the published figure is
+  protocol-dependent, which is worth stating plainly, **but it is not a defence of
+  our number** and must not be used as one.
+
 ## 6. Design decisions and why
 
 ### 6.1 The supervisor is a rare fallback, not a quality booster
@@ -1193,6 +1296,24 @@ cross-arm comparability; should still be disclosed.
 ### 8.7 No on-device measurements
 Everything is a device-agnostic proxy — tokens, escalation rate, memory footprint. **Do
 not make latency or battery claims without measuring on real hardware.**
+
+### 8.8 Reasoning validity was not hand-checked
+The 100-example manual labelling (§7 item 2) was not carried out. **No claim is made
+anywhere that answers are correct for the right reasons**, only that the final numbers
+match. A model can reach the right total by a wrong route, and this thesis cannot
+distinguish those cases. State this plainly rather than letting a reader assume
+otherwise.
+
+### 8.9 A single solver — the generality of the gate is untested
+Every result comes from one base model, `gemma-4-E2B-it`. The gate, the confidence
+tie-break and the stacking result are therefore demonstrated *on that model*, not shown
+to be general properties of sampled reasoning. A transfer experiment on a second solver
+from a different family was designed and implemented (§5.10) but **deliberately not
+run**; the code is committed and it can be executed later.
+
+This is the most substantive open question in the thesis, and it should be volunteered
+in the limitations section rather than waited for. The honest framing: *the mechanism
+is shown to work; how far it generalises across models is future work.*
 
 ---
 

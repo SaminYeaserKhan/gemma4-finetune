@@ -49,6 +49,7 @@ from thesis_pipeline.gsm8k import (
     build_prompt,
     build_retry_prompt,
     extract_final_answer,
+    family_for,
 )
 from thesis_pipeline.io_utils import append_jsonl, read_jsonl, repair_jsonl
 from thesis_pipeline.timing import Stopwatch
@@ -65,6 +66,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dataset-dir", default=None)
     parser.add_argument("--model-name", default=None)
     parser.add_argument("--adapter-dir", default=None)
+    parser.add_argument(
+        "--no-adapter",
+        action="store_true",
+        help="Run the base model with no LoRA adapter. Needed when evaluating a "
+        "different base model, since an empty --adapter-dir falls back to the "
+        "configured (Gemma) adapter.",
+    )
     parser.add_argument("--split", default="test", choices=["train", "test"])
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--offset", type=int, default=0)
@@ -261,14 +269,34 @@ def build_local_runner(cfg: ThesisConfig, provider: str, adapter_dir: Path | Non
     return run
 
 
+def resolve_adapter_dir(
+    adapter_dir: str | None, no_adapter: bool, default: Path
+) -> Path | None:
+    """Which LoRA adapter to load, including the option of none.
+
+    An empty `--adapter-dir` falls through to the configured default, which is
+    the Gemma adapter. Evaluating a different base model needs a way to say
+    "no adapter" that cannot be read as "not specified", or a Qwen run quietly
+    attempts to load Gemma weights onto it.
+    """
+    if no_adapter:
+        return None
+    return Path(adapter_dir) if adapter_dir else default
+
+
 def main() -> None:
     args = parse_args()
     cfg = ThesisConfig()
     if args.model_name:
         cfg = ThesisConfig(**{**cfg.__dict__, "model_name": args.model_name})
+    # Chat tags and stop token follow the base model; a mismatch produces a
+    # fluent, parseable, meaningless run rather than an error.
+    family = family_for(cfg.model_name)
 
     dataset_dir = Path(args.dataset_dir) if args.dataset_dir else cfg.dataset_dir
-    adapter_dir = Path(args.adapter_dir) if args.adapter_dir else cfg.final_adapter_dir
+    adapter_dir = resolve_adapter_dir(
+        args.adapter_dir, args.no_adapter, cfg.final_adapter_dir
+    )
     retry_limit = args.retry_limit if args.retry_limit is not None else cfg.retry_limit
     gate_kind = args.gate or cfg.gate_kind
     escalation_rate = (
@@ -415,9 +443,10 @@ def main() -> None:
             result = generate_answer(
                 model=gen_model,
                 tokenizer=gen_tokenizer,
-                prompt=build_prompt(question),
+                prompt=build_prompt(question, family),
                 max_new_tokens=max_new_tokens,
                 temperature=0.0,
+                family=family,
             )  # not timed: attempt 1 is normally replayed from cache, so a
                # figure here would describe some runs and not others
             candidate, gen_tokens, prompt_tokens = (
@@ -493,9 +522,12 @@ def main() -> None:
                 retry = generate_answer(
                     model=gen_model,
                     tokenizer=gen_tokenizer,
-                    prompt=build_retry_prompt(question, candidate, feedback_level, hint),
+                    prompt=build_retry_prompt(
+                        question, candidate, feedback_level, hint, family
+                    ),
                     max_new_tokens=max_new_tokens,
                     temperature=temperature,
+                    family=family,
                 )
             candidate = retry.text
             total_model_tokens += retry.tokens_generated

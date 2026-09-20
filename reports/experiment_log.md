@@ -673,3 +673,31 @@
 - verdict_cache: `outputs\verdict_cache.jsonl`
 - supervisor_new_calls: `2`
 
+## 2026-09-01T11:55:58Z - Generated GSM8K predictions: qwen_smoke_zeroshot
+
+- Type: `generation`
+- command: `C:\thesis\gemma4-finetune\venv\Scripts\python.exe generate.py --model-name Qwen/Qwen2.5-1.5B-Instruct --limit 5 --few-shot 0 --run-name qwen_smoke_zeroshot --output C:/Users/USER/AppData/Local/Temp/claude/C--thesis-gemma4-finetune/1d33a6e7-f9cf-44d2-8ab2-8522170486db/scratchpad/qwen_smoke_zeroshot.jsonl`
+- run_name: `qwen_smoke_zeroshot`
+- task: `gsm8k`
+- split: `test`
+- examples: `5`
+- adapter_dir: ``
+- output: `C:\Users\USER\AppData\Local\Temp\claude\C--thesis-gemma4-finetune\1d33a6e7-f9cf-44d2-8ab2-8522170486db\scratchpad\qwen_smoke_zeroshot.jsonl`
+- temperature: `0.0`
+- max_new_tokens: `512`
+- few_shot: `0`
+
+## 2026-09-01T11:57:14Z - Generated GSM8K predictions: qwen_smoke_8shot
+
+- Type: `generation`
+- command: `C:\thesis\gemma4-finetune\venv\Scripts\python.exe generate.py --model-name Qwen/Qwen2.5-1.5B-Instruct --limit 8 --few-shot 8 --run-name qwen_smoke_8shot --output C:/Users/USER/AppData/Local/Temp/claude/C--thesis-gemma4-finetune/1d33a6e7-f9cf-44d2-8ab2-8522170486db/scratchpad/qwen_smoke_8shot.jsonl`
+- run_name: `qwen_smoke_8shot`
+- task: `gsm8k`
+- split: `test`
+- examples: `8`
+- adapter_dir: ``
+- output: `C:\Users\USER\AppData\Local\Temp\claude\C--thesis-gemma4-finetune\1d33a6e7-f9cf-44d2-8ab2-8522170486db\scratchpad\qwen_smoke_8shot.jsonl`
+- temperature: `0.0`
+- max_new_tokens: `512`
+- few_shot: `8`
+

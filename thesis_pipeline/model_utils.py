@@ -8,6 +8,7 @@ from peft import PeftModel
 from transformers import AutoModelForImageTextToText, AutoTokenizer, BitsAndBytesConfig, StoppingCriteria, StoppingCriteriaList
 
 from .config import ThesisConfig
+from .gsm8k import GEMMA, ModelFamily, family_for
 
 
 class GenerationResult(NamedTuple):
@@ -147,8 +148,34 @@ def quantization_config() -> BitsAndBytesConfig:
     )
 
 
+def trim_at_end_tag(text: str, end_tag: str) -> str:
+    """Cut a decoded answer at its turn-end marker.
+
+    Generation decodes with `skip_special_tokens=False` so the marker is
+    visible to cut on. Anything after it is the model talking past its turn,
+    and must not survive into the stored prediction: `extract_final_answer`
+    falls back to the last number in the text, so trailing chatter can quietly
+    replace a correct answer.
+    """
+    if end_tag and end_tag in text:
+        return text.split(end_tag, 1)[0].strip()
+    return text.strip()
+
+
 def load_base_model(cfg: ThesisConfig, for_training: bool = False):
-    model = AutoModelForImageTextToText.from_pretrained(
+    """Load the solver in 4-bit, through whichever class its family needs.
+
+    Gemma 4 is a multimodal checkpoint and only loads through
+    `AutoModelForImageTextToText`; a text-only solver such as Qwen needs
+    `AutoModelForCausalLM`. `family_for` refuses an unregistered model rather
+    than guessing, because the wrong choice here fails loudly but the wrong
+    chat template downstream does not.
+    """
+    from transformers import AutoModelForCausalLM
+
+    family = family_for(cfg.model_name)
+    loader = AutoModelForImageTextToText if family.multimodal else AutoModelForCausalLM
+    model = loader.from_pretrained(
         cfg.model_name,
         quantization_config=quantization_config(),
         device_map="auto",
@@ -232,12 +259,13 @@ def generate_answer(
     max_new_tokens: int,
     temperature: float = 0.0,
     repetition_penalty: float = 1.15,
+    family: ModelFamily = GEMMA,
 ) -> GenerationResult:
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
     prompt_tokens = int(inputs["input_ids"].shape[-1])
     do_sample = temperature > 0
     eos_token_ids = [tokenizer.eos_token_id] if tokenizer.eos_token_id is not None else []
-    end_turn_tokens = tokenizer.encode("<end_of_turn>", add_special_tokens=False)
+    end_turn_tokens = tokenizer.encode(family.end_tag, add_special_tokens=False)
     stopping_criteria = StoppingCriteriaList([_MultiTokenStop(end_turn_tokens)]) if end_turn_tokens else None
     generation_kwargs = {
         "max_new_tokens": max_new_tokens,
@@ -252,9 +280,9 @@ def generate_answer(
     with torch.no_grad():
         output_ids = model.generate(**inputs, **generation_kwargs)
     generated_ids = output_ids[0][inputs["input_ids"].shape[-1] :]
-    decoded = tokenizer.decode(generated_ids, skip_special_tokens=False).strip()
-    if "<end_of_turn>" in decoded:
-        decoded = decoded.split("<end_of_turn>", 1)[0].strip()
+    decoded = trim_at_end_tag(
+        tokenizer.decode(generated_ids, skip_special_tokens=False), family.end_tag
+    )
     tokens_generated = len(tokenizer.encode(decoded, add_special_tokens=False))
     return GenerationResult(
         text=decoded,

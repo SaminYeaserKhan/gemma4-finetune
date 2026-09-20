@@ -3,38 +3,97 @@ from __future__ import annotations
 import re
 from decimal import Decimal, InvalidOperation
 from fractions import Fraction
-from typing import Any
+from typing import Any, NamedTuple
 
 
-USER_TAG = "<start_of_turn>user\n"
-MODEL_TAG = "<start_of_turn>model\n"
-END_TAG = "<end_of_turn>"
+class ModelFamily(NamedTuple):
+    """Everything about a base model that the pipeline has to vary.
+
+    The chat tags and the loader class travel together because they are two
+    faces of the same fact -- which model family this is. Separating them is
+    how a Qwen run can load correctly and then prompt in Gemma's dialect,
+    which produces fluent, parseable, meaningless output.
+    """
+
+    user_tag: str
+    model_tag: str
+    end_tag: str
+    multimodal: bool
+
+
+GEMMA = ModelFamily(
+    user_tag="<start_of_turn>user\n",
+    model_tag="<start_of_turn>model\n",
+    end_tag="<end_of_turn>",
+    # Gemma 4 is a multimodal checkpoint, so it loads through
+    # AutoModelForImageTextToText even when only text is ever used.
+    multimodal=True,
+)
+
+QWEN = ModelFamily(
+    user_tag="<|im_start|>user\n",
+    model_tag="<|im_start|>assistant\n",
+    end_tag="<|im_end|>",
+    multimodal=False,
+)
+
+_FAMILIES = (("gemma", GEMMA), ("qwen", QWEN))
+
+
+def family_for(model_name: str) -> ModelFamily:
+    """Chat format and loader class for a base model id.
+
+    Deliberately refuses an unrecognised model instead of defaulting. A wrong
+    chat template does not crash -- it yields a fluent run with a meaningless
+    accuracy, which is far more expensive to discover than an error here.
+    """
+    lowered = model_name.lower()
+    for needle, family in _FAMILIES:
+        if needle in lowered:
+            return family
+    raise ValueError(
+        f"No chat format registered for {model_name!r}. Add it to _FAMILIES in "
+        "thesis_pipeline/gsm8k.py -- guessing the template would produce a "
+        "plausible but invalid run."
+    )
+
+
+# Kept for the call sites that predate multi-model support.
+USER_TAG = GEMMA.user_tag
+MODEL_TAG = GEMMA.model_tag
+END_TAG = GEMMA.end_tag
 
 NUMBER_RE = re.compile(r"-?\d[\d,]*(?:\.\d+)?(?:/\d[\d,]*(?:\.\d+)?)?")
 
 
-def build_prompt(question: str) -> str:
-    return f"{USER_TAG}{question.strip()}\n{END_TAG}\n{MODEL_TAG}"
+def build_prompt(question: str, family: ModelFamily = GEMMA) -> str:
+    return f"{family.user_tag}{question.strip()}\n{family.end_tag}\n{family.model_tag}"
 
 
-def build_completion(answer: str) -> str:
-    return f"{answer.strip()}\n{END_TAG}"
+def build_completion(answer: str, family: ModelFamily = GEMMA) -> str:
+    return f"{answer.strip()}\n{family.end_tag}"
 
 
-def build_training_text(question: str, answer: str) -> str:
-    return build_prompt(question) + build_completion(answer)
+def build_training_text(
+    question: str, answer: str, family: ModelFamily = GEMMA
+) -> str:
+    return build_prompt(question, family) + build_completion(answer, family)
 
 
-def build_fewshot_prompt(question: str, shots: list[tuple[str, str]]) -> str:
+def build_fewshot_prompt(
+    question: str,
+    shots: list[tuple[str, str]],
+    family: ModelFamily = GEMMA,
+) -> str:
     """Multi-turn prompt with in-context (question, answer) examples.
 
     Used for evaluating the non-fine-tuned base model: the worked examples
     teach it the chain-of-thought + `#### <answer>` format from context.
     """
     prefix = "".join(
-        build_training_text(shot_q, shot_a) + "\n" for shot_q, shot_a in shots
+        build_training_text(shot_q, shot_a, family) + "\n" for shot_q, shot_a in shots
     )
-    return prefix + build_prompt(question)
+    return prefix + build_prompt(question, family)
 
 
 def build_retry_prompt(
@@ -42,6 +101,7 @@ def build_retry_prompt(
     previous_answer: str,
     level: int,
     hint: str | None = None,
+    family: ModelFamily = GEMMA,
 ) -> str:
     """Prompt for a second attempt after the supervisor rejected the first.
 
@@ -72,7 +132,7 @@ def build_retry_prompt(
     if level > 0 and hint and hint.strip():
         lines.append(hint.strip())
     lines.append("Solve the problem again and finish with `#### <final answer>`.")
-    return build_prompt("\n".join(lines))
+    return build_prompt("\n".join(lines), family)
 
 
 def format_gsm8k_example(example: dict[str, Any]) -> dict[str, str]:

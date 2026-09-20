@@ -30,7 +30,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from thesis_pipeline.config import ThesisConfig
-from thesis_pipeline.gsm8k import build_prompt, extract_final_answer
+from thesis_pipeline.gsm8k import build_prompt, extract_final_answer, family_for
 from thesis_pipeline.io_utils import append_jsonl, read_jsonl, repair_jsonl
 from thesis_pipeline.model_utils import answer_confidence, load_inference_model, load_tokenizer
 
@@ -59,6 +59,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--predictions", default=None, help="Defaults to the attempt-1 cache.")
     parser.add_argument("--adapter-dir", default="gemma4-gsm8k-final")
     parser.add_argument(
+        "--model-name",
+        default=None,
+        help="Base model id. Must match the model that wrote the predictions "
+        "being scored -- confidence is read from that model's own logits.",
+    )
+    parser.add_argument(
         "--output", default="outputs/predictions/05_confidence_for_try1.jsonl"
     )
     parser.add_argument("--limit", type=int, default=None)
@@ -69,6 +75,11 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     cfg = ThesisConfig()
+    if args.model_name:
+        cfg = ThesisConfig(**{**cfg.__dict__, "model_name": args.model_name})
+    # The confidence score is read off the same prompt the answer was written
+    # from; a different chat template would score a different sequence.
+    family = family_for(cfg.model_name)
     source = args.predictions or cfg.attempt1_cache
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -103,7 +114,7 @@ def main() -> int:
             result = answer_confidence(
                 model,
                 tokenizer,
-                build_prompt(row["question"]),
+                build_prompt(row["question"], family),
                 prediction,
                 final_answer_offset(prediction),
             )
