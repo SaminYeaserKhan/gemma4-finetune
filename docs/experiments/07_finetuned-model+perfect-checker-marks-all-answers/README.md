@@ -1,8 +1,8 @@
-# 07 — A perfect marker marks every answer (the upper limit)
+# 07 — The answer key used as the marker (the upper limit)
 
-**In standard terms:** Verdict-only pass with the exact-match oracle
+**In standard terms:** Verdict-only pass with the exact-match oracle; no second model is loaded
 
-A 'marker' that simply compares each answer with the answer key. It is not a real option, because a real marker never has the key. It exists to show the best any marker could possibly do, and to confirm the measuring code works.
+**Only one model runs in this experiment: the small AI.** There is no second model. The 'marker' is a few lines of code that compare each answer with the answer key, which is why it is never wrong. Nothing leaves the machine and no tokens are exchanged. It is here for two reasons: it shows the best score any marker could possibly reach, so the real markers in experiments 05 and 06 have something to be measured against, and it confirms our scoring code is correct — an answer key that scored anything but 100% would mean a bug.
 
 ## What it is made of
 
@@ -54,33 +54,26 @@ flowchart TB
         SOLVER["<b>The small AI, trained by us</b><br/>on 7,500 school maths problems"]
         ONE["Answers each question <b>once</b>"]
         SOLVER --> ONE
+        KEY["<b>The answer key</b><br/>a few lines of code compare each<br/>answer with the correct one<br/><b>no second AI is involved</b>"]
+        ONE --> KEY
     end
-    subgraph OFF["NOT ON YOUR MACHINE"]
-        direction TB
-        CHECK["<b>Marker</b><br/>a perfect marker that is shown the answer key<br/>a measuring stick, not a real option"]
-    end
-    ONE -->|every answer| CHECK
-    CHECK --> SCORE["<b>A mark for every answer</b><br/>the answer is never changed:<br/>this measures the marker"]
+    KEY --> SCORE["<b>A mark for every answer</b><br/>the answer is never changed:<br/>this measures the marking, not the system"]
     style DEV fill:#e8f4ea,stroke:#2d6a4f,stroke-width:2px
-    style OFF fill:#fdf0e6,stroke:#b5651d,stroke-width:2px
+    style KEY fill:#eeeeee,stroke:#888,stroke-dasharray: 4 4
 ```
 
 ```mermaid
 flowchart TD
     Q["<b>1,319 maths questions</b>"]
     Q --> A["The small AI answers each question once"]
-    A --> M["<b>The marker grades all 1,319 answers</b>"]
-    M -->|"says right<br/><b>737</b>"| OK["Marked right"]
-    M -->|"says wrong<br/><b>582</b>"| NO["Marked wrong"]
-    NO --> NW["<b>582</b> really were wrong<br/>caught 582 of the 582 wrong answers"]
-    NO --> NR["<b>0</b> were actually right<br/>a mistake by the marker"]
-    OK --> SAME["<b>No answer is changed</b><br/>the score stays the same"]
-    NW --> SAME
-    NR --> SAME
+    A --> M["<b>Each answer is compared with the answer key</b><br/>no second AI: this is a few lines of code"]
+    M -->|"matches<br/><b>737</b>"| OK["Counted right"]
+    M -->|"does not match<br/><b>582</b>"| NO["Counted wrong"]
+    OK --> SAME["<b>No answer is changed.</b><br/>This experiment shows the best score any<br/>marker could reach, and checks that our<br/>scoring code is correct."]
+    NO --> SAME
     SAME --> RES
     RES["<b>737 right</b> (55.9%)<br/>582 wrong"]
-    style M fill:#fdf0e6,stroke:#b5651d
-    style NR fill:#fdece9,stroke:#b03a2e
+    style M fill:#eeeeee,stroke:#888,stroke-dasharray: 4 4
     style RES fill:#e6eefc,stroke:#2b4c8c,stroke-width:2px
 ```
 

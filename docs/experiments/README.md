@@ -22,7 +22,7 @@ marker that gives a full hint*.
 - [`04_finetuned-model+majority-vote/`](04_finetuned-model+majority-vote/README.md) — Trained AI answers three times, most common answer kept
 - [`05_finetuned-model+checker-marks-all-answers_glm-30b/`](05_finetuned-model+checker-marks-all-answers_glm-30b/README.md) — A large AI marks every answer (measuring the marker)
 - [`06_finetuned-model+checker-marks-all-answers_qwen-9b/`](06_finetuned-model+checker-marks-all-answers_qwen-9b/README.md) — A medium AI marks every answer (measuring the marker)
-- [`07_finetuned-model+perfect-checker-marks-all-answers/`](07_finetuned-model+perfect-checker-marks-all-answers/README.md) — A perfect marker marks every answer (the upper limit)
+- [`07_finetuned-model+perfect-checker-marks-all-answers/`](07_finetuned-model+perfect-checker-marks-all-answers/README.md) — The answer key used as the marker (the upper limit)
 - [`08_finetuned-model+gate+checker_glm-30b_no-hint/`](08_finetuned-model+gate+checker_glm-30b_no-hint/README.md) — Trained AI + selection of hard questions (30%) + large AI marker, none hint
 - [`09_finetuned-model+gate+checker_glm-30b_short-hint/`](09_finetuned-model+gate+checker_glm-30b_short-hint/README.md) — Trained AI + selection of hard questions (30%) + large AI marker, short hint
 - [`10_finetuned-model+gate+checker_glm-30b_full-hint/`](10_finetuned-model+gate+checker_glm-30b_full-hint/README.md) — Trained AI + selection of hard questions (30%) + large AI marker, full hint
@@ -52,7 +52,7 @@ alone hides that.
 | [04](04_finetuned-model+majority-vote/README.md) | Trained AI answers three times, most common answer kept | 779 | 59.06% | +3.18 | 54 | 12 |
 | [05](05_finetuned-model+checker-marks-all-answers_glm-30b/README.md) | A large AI marks every answer (measuring the marker) | 737 | 55.88% | +0.00 | 0 | 0 |
 | [06](06_finetuned-model+checker-marks-all-answers_qwen-9b/README.md) | A medium AI marks every answer (measuring the marker) | 737 | 55.88% | +0.00 | 0 | 0 |
-| [07](07_finetuned-model+perfect-checker-marks-all-answers/README.md) | A perfect marker marks every answer (the upper limit) | 737 | 55.88% | +0.00 | 0 | 0 |
+| [07](07_finetuned-model+perfect-checker-marks-all-answers/README.md) | The answer key used as the marker (the upper limit) | 737 | 55.88% | +0.00 | 0 | 0 |
 | [08](08_finetuned-model+gate+checker_glm-30b_no-hint/README.md) | Trained AI + selection of hard questions (30%) + large AI marker, none hint | 756 | 57.32% | +1.44 | 46 | 27 |
 | [09](09_finetuned-model+gate+checker_glm-30b_short-hint/README.md) | Trained AI + selection of hard questions (30%) + large AI marker, short hint | 765 | 58.00% | +2.12 | 52 | 24 |
 | [10](10_finetuned-model+gate+checker_glm-30b_full-hint/README.md) | Trained AI + selection of hard questions (30%) + large AI marker, full hint | 784 | 59.44% | +3.56 | 70 | 23 |
@@ -136,13 +136,19 @@ outside service if the marker were one — which is the cost the thesis argues a
 ## Table 3 — How good each marker is
 
 These three experiments only grade answers; nothing is retried, so they do not change
-the score. They measure the marker itself.
+the score. They measure the marking itself.
+
+**Experiment 07 is not a marker you could use.** Only one model runs in it — the small
+AI. There is no second model: the "marker" is a few lines of code comparing each answer
+with the answer key, so it is never wrong and nothing leaves the machine. Its "marker
+calls" in Table 2 are local comparisons and cost no tokens. It is in this table to show
+the best score any marker could reach, and to confirm our scoring code is correct.
 
 | # | Marker | Wrong answers caught | Right answers wrongly failed | Correct when it said 'wrong' | Time per check |
 |---|---|---|---|---|---|
 | [05](05_finetuned-model+checker-marks-all-answers_glm-30b/README.md) | a large AI marker (GLM-4.7-Flash, 30 billion) | 83.5% | 25.5% | 72.1% | 2.07 s |
 | [06](06_finetuned-model+checker-marks-all-answers_qwen-9b/README.md) | a medium AI marker (Qwen3.5-9B, 9 billion) | 88.8% | 18.6% | 79.1% | 1.00 s |
-| [07](07_finetuned-model+perfect-checker-marks-all-answers/README.md) | a perfect marker that is shown the answer key | 100.0% | 0.0% | 100.0% | instant |
+| [07](07_finetuned-model+perfect-checker-marks-all-answers/README.md) | the answer key itself, compared in code (no second model) | 100.0% | 0.0% | 100.0% | instant |
 
 The 2-billion-parameter AI checking its own work was only tested on 30 questions, so it
 has no folder here: it caught 22% of wrong answers and wrongly failed 42% of right ones

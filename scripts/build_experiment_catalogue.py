@@ -127,7 +127,7 @@ class System:
 CHECKER_NAME = {
     "glm": "a large AI marker (GLM-4.7-Flash, 30 billion)",
     "qwen": "a medium AI marker (Qwen3.5-9B, 9 billion)",
-    "oracle": "a perfect marker that is shown the answer key",
+    "oracle": "the answer key itself, compared in code (no second model)",
 }
 HINT_TEXT = {
     "none": "only yes or no, with no explanation",
@@ -214,11 +214,9 @@ def systems() -> list[System]:
         ),
         System(
             "07_finetuned-model+perfect-checker-marks-all-answers",
-            "A perfect marker marks every answer (the upper limit)",
-            "Verdict-only pass with the exact-match oracle",
-            "A 'marker' that simply compares each answer with the answer key. It is not a real "
-            "option, because a real marker never has the key. It exists to show the best any "
-            "marker could possibly do, and to confirm the measuring code works.",
+            "The answer key used as the marker (the upper limit)",
+            "Verdict-only pass with the exact-match oracle; no second model is loaded",
+            "**Only one model runs in this experiment: the small AI.** There is no second model. The 'marker' is a few lines of code that compare each answer with the answer key, which is why it is never wrong. Nothing leaves the machine and no tokens are exchanged. It is here for two reasons: it shows the best score any marker could possibly reach, so the real markers in experiments 05 and 06 have something to be measured against, and it confirms our scoring code is correct — an answer key that scored anything but 100% would mean a bug.",
             "marking", "09_checker_perfect_oracle_marks_all", checker="oracle",
         ),
     ]
@@ -441,6 +439,14 @@ def architecture(s: System) -> str:
     elif s.kind == "marking":
         lines.append('        ONE["Answers each question <b>once</b>"]')
         lines.append("        SOLVER --> ONE")
+        if s.checker == "oracle":
+            # No second model exists in this experiment: the "marker" is a few
+            # lines of code comparing with the answer key. Drawing it outside the
+            # device, as the real markers are drawn, invents a model that was
+            # never run.
+            lines.append('        KEY["<b>The answer key</b><br/>a few lines of code compare each<br/>'
+                         'answer with the correct one<br/><b>no second AI is involved</b>"]')
+            lines.append("        ONE --> KEY")
     else:
         if s.stacked:
             lines.append('        VOTE["<b>Compare three attempts</b><br/>if two or three agree,<br/>keep that answer"]')
@@ -452,16 +458,18 @@ def architecture(s: System) -> str:
         lines.append("        SOLVER -->|three attempts| GATE")
     lines.append("    end")
 
-    if s.kind in ("marking", "cascade"):
+    if s.kind in ("marking", "cascade") and s.checker != "oracle":
         who = CHECKER_NAME[s.checker]
         lines += ['    subgraph OFF["NOT ON YOUR MACHINE"]', "        direction TB",
-                  f'        CHECK["<b>Marker</b><br/>{who}<br/><b>never shown the correct answer</b>"]'
-                  if s.checker != "oracle" else
-                  f'        CHECK["<b>Marker</b><br/>{who}<br/>a measuring stick, not a real option"]',
+                  f'        CHECK["<b>Marker</b><br/>{who}<br/><b>never shown the correct answer</b>"]',
                   "    end"]
     if s.kind == "marking":
-        lines.append("    ONE -->|every answer| CHECK")
-        lines.append('    CHECK --> SCORE["<b>A mark for every answer</b><br/>the answer is never changed:<br/>this measures the marker"]')
+        origin = "KEY" if s.checker == "oracle" else "CHECK"
+        if s.checker != "oracle":
+            lines.append("    ONE -->|every answer| CHECK")
+        lines.append(f'    {origin} --> SCORE["<b>A mark for every answer</b><br/>'
+                     "the answer is never changed:<br/>this measures the marking, "
+                     'not the system"]')
     elif s.kind == "cascade":
         lines.append("    GATE -->|hard questions only| CHECK")
         lines.append(f'    CHECK -->|"if wrong: {MARKER_REPLY[s.hint]}<br/>(never the answer)"| SOLVER')
@@ -470,8 +478,10 @@ def architecture(s: System) -> str:
             lines.append("    VOTE -->|agreed answers| OUT")
     lines += tail
     lines += ["    style DEV fill:#e8f4ea,stroke:#2d6a4f,stroke-width:2px"]
-    if s.kind in ("marking", "cascade"):
+    if s.kind in ("marking", "cascade") and s.checker != "oracle":
         lines.append("    style OFF fill:#fdf0e6,stroke:#b5651d,stroke-width:2px")
+    if s.checker == "oracle" and s.kind == "marking":
+        lines.append("    style KEY fill:#eeeeee,stroke:#888,stroke-dasharray: 4 4")
     return "\n".join(lines)
 
 
@@ -498,6 +508,16 @@ def question_flow(s: System) -> str:
               f'    D -->|"all three differed<br/><b>{g[3]}</b>"| F["No most-common answer,<br/>so keep the first attempt"]',
               "    K --> RES", "    F --> RES", end,
               "    style K fill:#e8f4ea,stroke:#2d6a4f"]
+    elif s.kind == "marking" and s.checker == "oracle":
+        L += ['    Q --> A["The small AI answers each question once"]',
+              f'    A --> M["<b>Each answer is compared with the answer key</b><br/>'
+              'no second AI: this is a few lines of code"]',
+              f'    M -->|"matches<br/><b>{f["accepted"]}</b>"| OK["Counted right"]',
+              f'    M -->|"does not match<br/><b>{f["rejected"]}</b>"| NO["Counted wrong"]',
+              '    OK --> SAME["<b>No answer is changed.</b><br/>This experiment shows the best score any<br/>'
+              'marker could reach, and checks that our<br/>scoring code is correct."]',
+              "    NO --> SAME", "    SAME --> RES", end,
+              "    style M fill:#eeeeee,stroke:#888,stroke-dasharray: 4 4"]
     elif s.kind == "marking":
         L += ['    Q --> A["The small AI answers each question once"]',
               f'    A --> M["<b>The marker grades all {total:,} answers</b>"]',
@@ -915,7 +935,13 @@ outside service if the marker were one — which is the cost the thesis argues a
 ## Table 3 — How good each marker is
 
 These three experiments only grade answers; nothing is retried, so they do not change
-the score. They measure the marker itself.
+the score. They measure the marking itself.
+
+**Experiment 07 is not a marker you could use.** Only one model runs in it — the small
+AI. There is no second model: the "marker" is a few lines of code comparing each answer
+with the answer key, so it is never wrong and nothing leaves the machine. Its "marker
+calls" in Table 2 are local comparisons and cost no tokens. It is in this table to show
+the best score any marker could reach, and to confirm our scoring code is correct.
 
 {chr(10).join(markers)}
 

@@ -60,7 +60,7 @@ flowchart TB
         CHECK["<b>Marker</b><br/>a medium AI marker (Qwen3.5-9B, 9 billion)<br/><b>never shown the correct answer</b>"]
     end
     ONE -->|every answer| CHECK
-    CHECK --> SCORE["<b>A mark for every answer</b><br/>the answer is never changed:<br/>this measures the marker"]
+    CHECK --> SCORE["<b>A mark for every answer</b><br/>the answer is never changed:<br/>this measures the marking, not the system"]
     style DEV fill:#e8f4ea,stroke:#2d6a4f,stroke-width:2px
     style OFF fill:#fdf0e6,stroke:#b5651d,stroke-width:2px
 ```
