@@ -76,6 +76,33 @@ class CatalogueAgreesWithTheThesisTests(unittest.TestCase):
 
 
 
+XLSX = REPO / "reports" / "benchmark_all_systems.xlsx"
+XLSX_COPY = REPO / "docs" / "experiments" / "benchmark_all_systems.xlsx"
+
+
+@unittest.skipUnless(XLSX.exists() and XLSX_COPY.exists(), "spreadsheet not present")
+class SpreadsheetCopiesAgreeTests(unittest.TestCase):
+    """The copy beside the experiment folders must say what the reports copy says.
+
+    It went stale once: the folder copy still described experiment 07 as "a perfect
+    marker" after that was corrected to "the answer key, no second model". Two
+    spreadsheets with the same name and different contents is the worst outcome, so
+    the generator now writes both and this pins them together.
+    """
+
+    def test_both_copies_hold_the_same_values(self):
+        try:
+            from openpyxl import load_workbook
+        except ImportError:
+            self.skipTest("openpyxl not installed")
+
+        for sheet in ("Benchmark", "Column guide"):
+            with self.subTest(sheet=sheet):
+                first = [list(r) for r in load_workbook(XLSX)[sheet].iter_rows(values_only=True)]
+                second = [list(r) for r in load_workbook(XLSX_COPY)[sheet].iter_rows(values_only=True)]
+                self.assertEqual(first, second)
+
+
 class ColumnNotesTests(unittest.TestCase):
     """Every column in the benchmark spreadsheet must explain itself.
 

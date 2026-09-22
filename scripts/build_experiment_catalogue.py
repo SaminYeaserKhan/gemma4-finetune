@@ -730,6 +730,11 @@ COLUMN_NOTES = {
 }
 
 XLSX_OUT = REPO / "reports" / "benchmark_all_systems.xlsx"
+# A second copy sits beside the experiment folders, because that is where anyone
+# browsing the catalogue looks for it. It is written here rather than copied by hand:
+# the hand-made copy silently went stale once already, and a spreadsheet that
+# disagrees with the folder it sits in is worse than no spreadsheet.
+XLSX_COPY = OUT / "benchmark_all_systems.xlsx"
 PERCENT_COLUMNS = {"accuracy", "sent_share"}
 
 
@@ -798,8 +803,9 @@ def write_xlsx(all_systems: list[System]) -> None:
         for cell in row:
             cell.alignment = Alignment(wrap_text=True, vertical="top")
 
-    XLSX_OUT.parent.mkdir(parents=True, exist_ok=True)
-    book.save(XLSX_OUT)
+    for destination in (XLSX_OUT, XLSX_COPY):
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        book.save(destination)
 
 
 def write_csv(all_systems: list[System]) -> None:
@@ -1060,7 +1066,7 @@ def main() -> int:
     (OUT / "README.md").write_text(index_readme(all_systems, data, pass_at_3(data)), encoding="utf-8")
     write_csv(all_systems)
     write_xlsx(all_systems)
-    print(f"\nWrote {OUT / 'README.md'}\nWrote {CSV_OUT}\nWrote {XLSX_OUT}")
+    print(f"\nWrote {OUT / 'README.md'}\nWrote {CSV_OUT}\nWrote {XLSX_OUT}\nWrote {XLSX_COPY}")
     return 0
 
 
