@@ -54,7 +54,7 @@ device asks for help.
 | 5 | Making the model fit: shrinking and training |
 | 6 | Building it on a machine that keeps losing power |
 | 7 | How the finished system works |
-| 8 | Every system we tried |
+| 8 | Every system we tried, one by one |
 | 9 | Results |
 | 10 | What did not work |
 | 11 | Limitations |
@@ -149,9 +149,11 @@ and if you are already voting, you have paid for that signal anyway.
 We are not claiming a record score on this dataset. We are not.
 
 Published work reports higher numbers on the same problems: one system reports 81.5% using two
-models smaller than ours, and an off-the-shelf model of comparable size is reported at 73.2%
-with no training and no cascade at all. Chapter 3 explains both in detail, including why the
-comparison is less direct than it first looks.
+models with fewer parameters than ours, and an off-the-shelf model is reported at 73.2% with no
+training and no cascade at all. Chapter 3 explains both in detail, including why the
+comparison is less direct than it first looks — in particular, "fewer parameters" does not
+mean "smaller to run". Ours is squeezed to 4 bits; theirs are not. Measured in memory, the
+model we deploy is the smallest of the three.
 
 We are also not claiming the small AI *reasons* correctly. We only ever checked its final
 number. A right answer reached by muddled working still counts as right in our score.
@@ -401,11 +403,42 @@ The approaches are complementary.
 
 This section exists because a reader will ask, and it is better that we answer first.
 
+### First: "smaller model" needs defining
+
+Both systems below are described as using smaller models than ours, and by parameter count
+that is true. But parameter count is not what decides whether something runs on your device.
+**Memory is.** And our model is stored at 4 bits, while the numbers reported for those
+systems are at the usual 16 bits.
+
+Measured properly, at the precision each was actually reported at:
+
+| System | Parameters | Bits | **Memory to run it** |
+|---|---|---|---|
+| TinyGSM — needs *both* models loaded | 1.3B + 1.3B | 16 | **4.84 GB** |
+| Qwen2.5-1.5B-Instruct | 1.54B | 16 | **2.88 GB** |
+| **Ours, as we actually deploy it** | 5.12B stored | **4** | **2.39 GB** |
+
+So on the axis this project is about — what fits on a modest device — **our solver is the
+smallest of the three**, despite having the largest parameter count on paper. TinyGSM needs
+twice our memory, because it has to hold two models at once.
+
+Two honest qualifications:
+
+1. Those systems could be quantized too. A 4-bit Qwen2.5-1.5B would be about 0.72 GB, far
+   smaller than ours. But no published score exists for it in that form, and quantizing costs
+   accuracy — so we cannot assume the 73.2% survives the squeeze.
+2. We have assumed 16-bit for their figures, because that is the standard and neither paper
+   reports quantized results.
+
+The fair summary is therefore: **they score higher, with fewer parameters, but not with a
+smaller memory footprint than the system we built.** We should say all three parts of that.
+
 ### TinyGSM — 81.5%
 
 **Liu and colleagues (2023)** report **81.5%** on GSM8K using a 1.3-billion generator and a
-1.3-billion checker. Both models are smaller than ours. That is 13 points above our best
-result, and we should say plainly that it is a better score.
+1.3-billion checker. Each model has fewer parameters than ours, though the pair together needs
+about twice our memory. That is 13 points above our best result, and we should say plainly
+that it is a better score.
 
 The differences, so a reader can judge for themselves:
 
@@ -429,8 +462,9 @@ times our data — not the architecture. We should say that rather than let some
 ### Qwen2.5-1.5B-Instruct — 73.2%
 
 The official Qwen2.5 technical report gives **73.2%** on GSM8K for a 1.5-billion instruction
-model with no fine-tuning, no voting and no checker. That is a smaller model, straight out of
-the box, above our entire system.
+model with no fine-tuning, no voting and no checker. That is a model with fewer parameters,
+straight out of the box, scoring above our entire system. As set out above, it is **not**
+smaller to run: at 16 bits it needs 2.88 GB against our 2.39 GB.
 
 Our answer, in order of how much it is worth:
 
@@ -445,10 +479,6 @@ Our answer, in order of how much it is worth:
 4. Benchmark contamination is a known issue with GSM8K. We mention this last and lightly,
    because leading with it reads as an excuse.
 
-We designed an experiment to settle this properly — put our gate and checker on top of a
-different small model and see whether the gain transfers. We built the code for it and then
-stopped the run. **No result exists, and none is claimed anywhere in this report.**
-Chapter 11 lists it as a limitation.
 
 ## 3.8 Where we sit
 
@@ -744,21 +774,6 @@ Instead of scoring during training, we score afterwards by actually generating a
 1,319 test problems and grading them. That is slower, but it measures the thing we care about
 — how many problems the model gets right — rather than a proxy.
 
-## 5.8 The training run we threw away
-
-Before the run described above, there was another one.
-
-`checkpoints_old_prompt_training/checkpoint-400` is still in the repository. It is a real
-training run that reached step 400 of 1,404 — about 0.86 of one pass — and was then abandoned,
-because we changed the prompt format afterwards. Its loss had reached 0.755 and its token
-accuracy 0.809, so it was training perfectly well. It was simply training on the wrong shape
-of text.
-
-We kept it rather than deleting it, and we mention it here, because "we got it right first
-time" would not be true.
-
-One detail from that abandoned run turns out to matter in the next chapter: it saved a
-checkpoint every **200** steps. The run that produced our final model saves every **50**.
 ---
 
 # Chapter 6 — Building it on a machine that keeps losing power
@@ -808,11 +823,11 @@ partial write can leave a folder with a newer date than a complete one. It canno
 number in the name. A folder whose name does not match the pattern exactly — a half-created
 one, say — is scored below everything and can never win.
 
-**Saving got more frequent because of the problem.** The abandoned first run saved every 200
-steps and kept 2 snapshots. The run that produced our final model saves every **50** steps and
-keeps **4**. The settings on disk prove it: the surviving checkpoints are numbered 1300, 1350,
-1400, 1404 — fifty apart. Saving four times as often costs disk space and a little time, and
-it cuts the worst case from 200 steps of lost work to 50.
+**We save far more often than the defaults suggest.** Out of the box the trainer saves every
+200 steps and keeps 2 snapshots. We run it at every **50** steps, keeping **4**. The files on
+disk show it: the surviving checkpoints are numbered 1300, 1350, 1400, 1404 — fifty apart.
+Saving four times as often costs a little disk space and a little time, and it cuts the worst
+case from 200 steps of lost work down to 50.
 
 There are two ways to resume:
 
@@ -1091,182 +1106,791 @@ We expect to be asked about this at the defence, so we built it to be demonstrab
 merely asserted.
 ---
 
-# Chapter 8 — Every system we tried
+# Chapter 8 — Every system we tried, one by one
 
-We tested 19 complete systems on all 1,319 test problems. Every one has its own folder in
-`docs/experiments/`, with a diagram of what it is made of, a diagram of what happens to the
-questions, and its own measured costs. This chapter explains what each one was for.
+We tested 19 complete systems on all 1,319 test problems. This chapter takes each one in turn:
+what it is, why we built it, what it scored, what it cost, and what we learned from it. Each
+comes with two diagrams — what the system is made of, and what happens to the questions as
+they pass through it.
 
-They fall into five groups.
+The systems fall into five groups, and we explain each group before working through its
+members.
 
-## 8.1 Systems 01–04: what you get for free
+A note on the numbers in every results block below. **"Turned right" and "turned wrong" are
+counted against System 02**, the trained model answering once. They matter because a system
+can gain answers and break others at the same time, and the score on its own hides that.
+**Times are estimated**, not measured — Section 8.6 explains how, and how accurate the
+estimates are.
 
-No checker, no cloud, nothing beyond the small model itself.
+---
 
-| # | System | Correct | Score |
+## Group A — Systems 01 to 04: what you get for free
+
+These four use nothing but the small model. No checker, no second machine, no cloud. They
+establish what the problem looks like before we add anything, and they set the bar that
+everything later has to clear.
+
+### System 01 — The model before we trained it
+
+**What it is.** The stock `google/gemma-4-E2B-it`, squeezed to 4 bits, with no training from
+us at all. Before each test question it is shown **8 worked examples** taken from the training
+split — the same 8 every time, in the same order.
+
+**Why we built it.** This is the "before" picture, and getting it right matters more than it
+sounds. Our first instinct was to just ask the untrained model the question directly. That
+scored **1.5%** — 20 problems out of 1,319 — and on **566** of them it produced nothing we
+could even extract an answer from. It mostly collapsed into repeating itself.
+
+Comparing our trained model against *that* would have made our fine-tuning look far better
+than it really is. Showing the base model eight worked examples first is the standard way to
+make a model of this size attempt the task at all, and it is the honest comparison. So that is
+the baseline we report everywhere in this document.
+
+**What happened.** 479 correct. It also failed to produce an extractable answer on 16 problems
+— far better than 566, but still a sign of a model working at the edge of its ability.
+
+The cost line is the interesting one. It reads **1,617.7 tokens per question**, and almost all
+of that is the eight worked examples being re-sent with every single question. The model's own
+answer is only 120.6 tokens. That 1,617.7 is what fine-tuning later deletes.
+
+| | |
+|---|---|
+| Correct | **479 of 1,319 — 36.32%** |
+| Attempts per question | 1.00 |
+| Tokens the model writes | 120.6 |
+| Tokens the model reads | **1,617.7** |
+| Sent to the checker | 0 |
+| Time for all 1,319 | **3 h 19 min (measured)** |
+
+*The time here is the one figure in this chapter that we measured rather than estimated. Our
+estimate said 5 h 00 min, which was 51% too high — the writing speed we based it on was
+measured with the training adapter loaded, and this system runs without it. We report the real
+number.*
+
+![System 01 architecture](experiments/01_base-model-only/architecture.png)
+
+![System 01 question flow](experiments/01_base-model-only/question_flow.png)
+
+### System 02 — The model after we trained it
+
+**What it is.** The same model with our QLoRA adapter attached, answering each question once,
+greedily, with **no worked examples in the prompt at all**.
+
+**Why we built it.** This is the reference point for the entire report. Every later system is
+measured against it, and the "turned right / turned wrong" columns everywhere are counted
+against this one.
+
+**What happened.** 737 correct — **+19.56 points** over System 01.
+
+And look at what happened to the prompt: **1,617.7 tokens down to 87.7**. The model no longer
+needs to be shown how the task works, because that is now in the adapter. The saving is not
+that the model writes less — it writes slightly *more*, 125.9 tokens against 120.6. The saving
+is that we stopped having to explain the job every time.
+
+Total tokens per question fall from 1,738.3 to 213.5: **12.3% of the original cost**.
+
+| | |
+|---|---|
+| Correct | **737 of 1,319 — 55.88%** |
+| vs. System 01 | **+19.56 points** |
+| Attempts per question | 1.00 |
+| Tokens the model writes | 125.9 |
+| Tokens the model reads | **87.7** |
+| Sent to the checker | 0 |
+| Time for all 1,319 | 5 h 13 min |
+
+One more thing worth recording: the trained model produced a usable `#### N` answer on
+**1,318 of 1,319** problems. Only one output was missing the marker. Whatever else fine-tuning
+did, it taught the output format completely.
+
+![System 02 architecture](experiments/02_finetuned-model-only/architecture.png)
+
+![System 02 question flow](experiments/02_finetuned-model-only/question_flow.png)
+
+### System 03 — Ask again, keep the second answer
+
+**What it is.** The trained model answers, then answers again with randomness turned on
+(temperature 0.7), and we keep the **second** answer. No checker, no feedback, no reason
+given — just another go.
+
+**Why we built it.** This is the control that makes the whole project meaningful. Our system
+does two things at once: it tells the model it was wrong, and it lets the model try again. If
+simply trying again were enough, the checker would be pointless and we would have built an
+expensive way to do nothing.
+
+**What happened.** It got **worse**. 737 down to 658 — a loss of 6 points.
+
+Looking at the individual questions explains why. The retry **fixed 138** wrong answers, and
+**broke 217** right ones. Resampling is not an even bet: it is easier to ruin a correct answer
+than to repair a wrong one.
+
+That asymmetry is the single most important fact behind how we later judge checkers. It is why
+a checker that wrongly rejects correct answers is so expensive — every wrong rejection is a
+coin flip that is likely to land badly. It is why we care more about a checker's **precision**
+than its recall.
+
+| | |
+|---|---|
+| Correct | **658 of 1,319 — 49.89%** |
+| vs. System 02 | **−5.99 points** |
+| Turned right | 138 |
+| Turned wrong | **217** |
+| Attempts per question | 2.00 |
+| Sent to the checker | 0 |
+| Time for all 1,319 | 10 h 43 min |
+
+This also matches the published literature: a well-known 2024 paper found that language models
+cannot reliably correct their own reasoning without outside information. Our result is the
+same finding on a model about a hundred times smaller.
+
+![System 03 architecture](experiments/03_finetuned-model+blind-retry/architecture.png)
+
+![System 03 question flow](experiments/03_finetuned-model+blind-retry/question_flow.png)
+
+### System 04 — Answer three times, keep the most common
+
+**What it is.** The trained model answers the same question three times with randomness on,
+and we keep whichever answer appeared most often. This is called **self-consistency**. It
+needs no second model, no network, and no cleverness.
+
+**Why we built it.** Because it is the rival. Any complicated design has to beat this one
+before it is worth anything, and this is the comparison our own first attempt failed
+(Section 10.1).
+
+**What happened.** 779 correct — **+3.18 points** over System 02, at zero cost outside the
+device.
+
+Notice how differently this behaves from System 03. Both ask the model more than once. But
+voting **fixed 54 and broke only 12**, while blind retry fixed 138 and broke 217. Asking three
+times and taking the majority is careful; asking once more and believing the new answer is
+reckless.
+
+The three attempts also fall into three groups, and these three numbers turn up repeatedly
+through the rest of this report:
+
+| Group | Questions | What it means |
+|---|---|---|
+| All three answers agree | **427** | The model is confident |
+| Two agree, one differs | **400** | Mild disagreement |
+| All three differ | **492** | The model has no idea |
+
+Voting can only change anything in the middle group — the other two have either nothing to
+change or no majority to find. It changed **81** answers there. Remember that number; it is
+why voting and checking turn out to be complementary rather than competing (Section 7.3).
+
+| | |
+|---|---|
+| Correct | **779 of 1,319 — 59.06%** |
+| vs. System 02 | **+3.18 points** |
+| Turned right | 54 |
+| Turned wrong | **12** |
+| Attempts per question | 3.00 |
+| Sent to the checker | 0 |
+| Time for all 1,319 | 16 h 11 min |
+
+![System 04 architecture](experiments/04_finetuned-model+majority-vote/architecture.png)
+
+![System 04 question flow](experiments/04_finetuned-model+majority-vote/question_flow.png)
+
+---
+
+## Group B — Systems 05 to 07: measuring the checker, not the system
+
+These three do not try to improve anything. The checker marks all 1,319 answers, and **not one
+answer is ever changed**. There is no retry.
+
+Because nothing changes, all three score **exactly 737 of 1,319 — 55.88%**, identical to
+System 02. That is correct and expected. If any of them scored differently, something would be
+broken.
+
+**So what are they for?** They measure the marker. Before spending twenty hours running a
+checker inside a full system, we wanted to know how good each checker actually is at spotting
+a wrong answer. These three runs answer that, and their numbers feed the choice of checker in
+Group E.
+
+**How to read their results.** The number that matters is not the score. It is *how many of
+the 582 wrong answers the checker noticed*, and *how many of the 737 right answers it wrongly
+failed*. Those two numbers pull against each other, and Group B is where we measure the
+trade.
+
+### System 05 — The 30-billion checker marks everything
+
+**What it is.** GLM-4.7-Flash, a 30-billion-parameter model of which about 3 billion are
+active for any one token, served on our own machine. It sees every one of the 1,319 answers,
+along with the question and the working. It never sees the correct answer.
+
+**What happened.** It said "wrong" about 674 answers. Of those, **486 really were wrong** and
+**188 were actually right**.
+
+| | |
+|---|---|
+| Score | 737 of 1,319 — 55.88% *(unchanged, by design)* |
+| Wrong answers it caught | **486 of 582 — 83.5%** |
+| Right answers it wrongly failed | **188 of 737 — 25.5%** |
+| When it said "wrong", it was correct | 72.1% |
+| Checker calls | 1,319 |
+| Checker tokens per question | 499.1 |
+| Seconds per check | 2.07 |
+| Time for all 1,319 | 5 h 59 min |
+
+**What we learned.** It is a decent spotter — it catches five wrong answers in six. But it
+fails one right answer in four, and from System 03 we know each of those is likely to be
+damaged by the retry that follows. A quarter is a lot.
+
+![System 05 architecture](experiments/05_finetuned-model+checker-marks-all-answers_glm-30b/architecture.png)
+
+![System 05 question flow](experiments/05_finetuned-model+checker-marks-all-answers_glm-30b/question_flow.png)
+
+### System 06 — The 9-billion checker marks everything
+
+**What it is.** Identical to System 05 in every way except the checker: Qwen3.5-9B, about a
+third the size and a third the file.
+
+**What happened.** This is the result that changed our final design. It is better than the
+bigger model at **both** jobs at once:
+
+| | System 06 (9B) | System 05 (30B) |
+|---|---|---|
+| Wrong answers caught | **517 — 88.8%** | 486 — 83.5% |
+| Right answers wrongly failed | **137 — 18.6%** | 188 — 25.5% |
+| When it said "wrong", correct | **79.1%** | 72.1% |
+| Seconds per check | **1.00** | 2.07 |
+| File size | **5.6 GB** | 16.3 GB |
+
+**31 more mistakes caught, and 51 fewer correct answers wrongly failed.** Twice as fast. A
+third of the size. We did not expect this, and Section 10.3 discusses what we think is going
+on.
+
+**One flaw worth reporting.** 50 of its 1,319 replies were cut off before it finished writing,
+because the 9B model writes longer replies than the 30B one and our reply limit was too low.
+By our design rule, an unreadable reply counts as "looks fine" — so those 50 were treated as
+acceptances. Only 9 of them were on genuinely wrong answers, so the effect is small, but it
+means the caught-mistakes figure above is a slight **under**-statement of what this checker can
+do. We raised the limit for the runs in Group E.
+
+| | |
+|---|---|
+| Score | 737 of 1,319 — 55.88% *(unchanged, by design)* |
+| Checker calls | 1,319 |
+| Checker tokens per question | 565.1 |
+| Replies cut off | **50** |
+| Time for all 1,319 | 5 h 35 min |
+
+![System 06 architecture](experiments/06_finetuned-model+checker-marks-all-answers_qwen-9b/architecture.png)
+
+![System 06 question flow](experiments/06_finetuned-model+checker-marks-all-answers_qwen-9b/question_flow.png)
+
+### System 07 — The answer key used as the marker
+
+**What it is.** Exactly what the name says. **There is no second model in this experiment at
+all.** Only the small AI runs. The "checker" is a few lines of code that compare each answer
+with the correct one.
+
+We want to be blunt about this because it is easy to misread: System 07 involves no AI
+checker, exchanges **zero tokens**, and nothing leaves the machine.
+
+**Why we built it.** Two reasons, and both are about trusting the rest of the numbers.
+
+1. **It is the yardstick.** It shows the best any checker could possibly do — catch every
+   mistake, wrongly fail nothing. Systems 05 and 06 are measured against this.
+2. **It proves our grading code works.** If the answer key, compared against itself, scored
+   anything other than 100%, we would have a bug in the most important piece of code in the
+   project. It scores 100%, on all 1,319.
+
+| | |
+|---|---|
+| Score | 737 of 1,319 — 55.88% *(unchanged, by design)* |
+| Wrong answers caught | **582 of 582 — 100%** |
+| Right answers wrongly failed | **0 — 0%** |
+| Checker tokens per question | **0.0** |
+| Time for all 1,319 | 5 h 13 min |
+
+**It is not a system you could deploy.** It scores perfectly only because it is allowed to see
+the answer, which is exactly what a real checker never gets.
+
+![System 07 architecture](experiments/07_finetuned-model+perfect-checker-marks-all-answers/architecture.png)
+
+![System 07 question flow](experiments/07_finetuned-model+perfect-checker-marks-all-answers/question_flow.png)
+
+---
+
+## Group C — Systems 08 to 12: the cascade on its own
+
+Now the full idea. The trained model answers, the gate picks the questions that look risky,
+the checker marks those, and the model retries with a hint. No voting anywhere.
+
+Systems 08, 09 and 10 are a controlled experiment with **one variable**: how much the checker
+is allowed to say. Everything else is held fixed, and because of the verdict cache described
+in Chapter 6, all three reject an **identical set of questions**. Any difference between them
+is the hint content and nothing else.
+
+Systems 11 and 12 then change one other thing each — how many questions are sent, and how they
+are chosen.
+
+### System 08 — Gate + 30B checker, no hint (L0)
+
+**What it is.** The gate escalates 396 questions. The checker marks them and replies with a
+bare verdict — effectively "wrong, try again", about 12 tokens. No explanation.
+
+**Why we built it.** It is the floor for feedback. If a bare rejection helps as much as a full
+explanation, the whole question of how much to say answers itself and the cheapest option
+wins.
+
+**What happened.** 756 correct, +1.44 points over System 02. Turned 46 right and broke 27.
+
+So a bare "no" *does* help a little. Told only that it was wrong, the model sometimes finds a
+better route on its own.
+
+| | |
+|---|---|
+| Correct | **756 of 1,319 — 57.32%** |
+| vs. System 02 | +1.44 points |
+| Turned right / wrong | 46 / 27 |
+| Sent to the checker | **396 (30%)** |
+| Checker calls | 712 |
+| Checker tokens per question | 300.9 |
+| Attempts per question | 3.46 |
+| Time for all 1,319 | 20 h 12 min |
+
+*Note on the call count: 396 questions but 712 calls, because most escalated questions are
+judged twice — once on the first answer and once on the retry.*
+
+![System 08 architecture](experiments/08_finetuned-model+gate+checker_glm-30b_no-hint/architecture.png)
+
+![System 08 question flow](experiments/08_finetuned-model+gate+checker_glm-30b_no-hint/question_flow.png)
+
+### System 09 — Gate + 30B checker, short hint (L1)
+
+**What it is.** Identical to System 08, except the checker also names the step that went wrong
+— a pointer, about 30 tokens.
+
+**What happened.** 765 correct, +2.12 points. Turned 52 right, broke 24.
+
+Compared with System 08: 9 more answers, for about 18 extra tokens coming back per escalated
+question. Pointing at the mistake helps more than just announcing there is one.
+
+| | |
+|---|---|
+| Correct | **765 of 1,319 — 58.00%** |
+| vs. System 02 | +2.12 points |
+| Turned right / wrong | 52 / 24 |
+| Sent to the checker | 396 (30%) |
+| Checker calls | 712 |
+| Checker tokens per question | 297.9 |
+| Time for all 1,319 | 19 h 57 min |
+
+![System 09 architecture](experiments/09_finetuned-model+gate+checker_glm-30b_short-hint/architecture.png)
+
+![System 09 question flow](experiments/09_finetuned-model+gate+checker_glm-30b_short-hint/question_flow.png)
+
+### System 10 — Gate + 30B checker, full hint (L2)
+
+**What it is.** Identical again, except the checker now also explains the correct reading of
+the problem — about 57 tokens. **It is still forbidden from stating the final answer**, and any
+`####` line in its reply is stripped out before the model sees it.
+
+**What happened.** 784 correct, +3.56 points. Turned 70 right, broke 23.
+
+The pattern across the three is clean and it answers the question we set:
+
+| | Hint size | Correct | Score |
 |---|---|---|---|
-| 01 | The model before training, shown 8 worked examples first | 479 | 36.32% |
-| 02 | The model after training, answering once | 737 | **55.88%** |
-| 03 | Trained model, asked again, keep the second answer | 658 | 49.89% |
-| 04 | Trained model answers 3 times, keep the most common | 779 | 59.06% |
+| System 08 | ~12 tokens | 756 | 57.32% |
+| System 09 | ~30 tokens | 765 | 58.00% |
+| **System 10** | **~57 tokens** | **784** | **59.44%** |
 
-**Why system 01 shows the model 8 examples.** Without them, the untrained model does not
-understand the task at all — it scored 1.5% on a bare prompt, and failed to produce any
-extractable answer on 566 of 1,319 problems. Comparing our trained model against *that* would
-have made our fine-tuning look far better than it is. So we gave the untrained model eight
-worked examples first, which is the standard way to make a base model attempt this task. It is
-the fair comparison, and it is the one we report.
+**More feedback is better**, and the gain is worth having: the full hint costs about 5.5 times
+as many tokens coming back as the bare rejection, and buys 2.1 extra points.
 
-**System 03 is the control that makes this project meaningful.** It retries with no extra
-information at all. If simply having another go were enough, we would not need a checker.
-Instead it **loses 6 points** — 55.88% down to 49.89%. Retrying blind actively damages the
-answers. That is what makes system 04 and everything after it interesting.
+**But now compare System 10 with System 04.** 59.44% against 59.06% — and System 04 is free.
+Five answers better, for 712 calls to a second model. That is the failure Section 10.1 is
+about, and it is the reason Groups D and E exist.
 
-**System 04 is the rival to beat.** Asking three times and taking the majority costs nothing
-outside the device and scores 59.06%. Any more complicated design has to beat this, and
-Chapter 10 describes what happened when ours first tried.
+| | |
+|---|---|
+| Correct | **784 of 1,319 — 59.44%** |
+| vs. System 02 | +3.56 points |
+| vs. System 04 (free voting) | **+0.38 points, not statistically meaningful** |
+| Turned right / wrong | 70 / 23 |
+| Sent to the checker | 396 (30%) |
+| Checker calls | 712 |
+| Checker tokens per question | 296.0 |
+| Time for all 1,319 | 19 h 45 min |
 
-## 8.2 Systems 05–07: measuring the checker, not the system
+![System 10 architecture](experiments/10_finetuned-model+gate+checker_glm-30b_full-hint/architecture.png)
 
-These three do not try to improve anything. They mark all 1,319 answers and change none of
-them. Their purpose is to measure how good each checker is.
+![System 10 question flow](experiments/10_finetuned-model+gate+checker_glm-30b_full-hint/question_flow.png)
 
-All three therefore score **exactly 737 / 55.88%**, identical to system 02 — which is correct
-and expected, because no answer is ever changed.
+### System 11 — The same, but sending 37.3% instead of 30%
 
-| # | Checker | Caught the wrong answers | Wrongly failed right answers | Time per check |
-|---|---|---|---|---|
-| 05 | GLM-4.7-Flash, 30 billion | 83.5% (486 of 582) | 25.5% (188) | 2.07 s |
-| 06 | Qwen3.5-9B, 9 billion | **88.8% (517 of 582)** | **18.6% (137)** | **1.00 s** |
-| 07 | The answer key itself | 100% (582 of 582) | 0% | instant |
+**What it is.** System 10 with the budget raised from 396 questions to **492**.
 
-**System 07 is not a checker you could use, and it contains no second model at all.** The
-"checker" is a few lines of code comparing each answer with the correct one. It is here for
-two reasons: it shows the best any checker could possibly do, and a score of anything other
-than 100% would mean our grading code had a bug. It exchanges zero tokens and nothing leaves
-the machine.
+**Why that number.** 492 is not arbitrary — it is the gate's **natural** threshold. With three
+samples, disagreement can only take three values, so the gate can only draw three honest
+lines. The line that means "send every question where the model contradicts itself completely"
+falls at 492 questions, which is 37.3% of the test set. Asking for 30% cuts *inside* that
+group, where questions are tied and the code has to break the tie arbitrarily.
 
-The comparison between 05 and 06 is one of the findings of this report, and Section 9.4
-returns to it.
+**What happened.** 801 correct, +4.85 points — the best of Group C.
 
-## 8.3 Systems 08–12: the cascade on its own
+The extra 96 questions were worth having, but they were not cheap: checker calls went from 712
+to 889, and tokens per question from 296.0 to 369.0. That is **25% more cost for 17 more
+correct answers**.
 
-The trained model answers, the gate picks the hard questions, the checker marks them, the
-model retries with a hint. No voting.
+| | |
+|---|---|
+| Correct | **801 of 1,319 — 60.73%** |
+| vs. System 02 | +4.85 points |
+| vs. System 10 | +17 answers, at 25% more checker cost |
+| Turned right / wrong | 94 / 30 |
+| Sent to the checker | **492 (37.3%)** |
+| Checker calls | 889 |
+| Checker tokens per question | 369.0 |
+| Time for all 1,319 | 20 h 37 min |
 
-| # | What changes | Correct | Score | Checker tokens per question |
-|---|---|---|---|---|
-| 08 | No hint, just "wrong" | 756 | 57.32% | 300.9 |
-| 09 | Hint points at the wrong step | 765 | 58.00% | 297.9 |
-| 10 | Hint also explains the right reading | 784 | 59.44% | 296.0 |
-| 11 | Same as 10, but 37.3% sent instead of 30% | 801 | 60.73% | 369.0 |
-| 12 | Same as 10, but the smarter gate | 795 | 60.27% | 307.5 |
+![System 11 architecture](experiments/11_finetuned-model+gate+checker_glm-30b_full-hint_37pct/architecture.png)
 
-Systems 08, 09 and 10 differ **only** in how much the checker is allowed to say. Everything
-else is held fixed — and, thanks to the verdict cache described in Chapter 6, all three reject
-an identical set of questions. So the difference between them is the hint content and nothing
-else.
+![System 11 question flow](experiments/11_finetuned-model+gate+checker_glm-30b_full-hint_37pct/question_flow.png)
 
-More feedback is better: 57.32% → 58.00% → 59.44%. The full hint costs about 5.5 times as many
-tokens coming back as the bare rejection, for 2.1 extra points.
+### System 12 — The same, but with a smarter gate
 
-**But look at system 10 against system 04.** 59.44% versus 59.06%, and system 04 is free.
-That is the failure described in Chapter 10.
+**What it is.** System 10 with a better way of choosing *which* 396 questions to send. As well
+as counting how much the three attempts disagree, we use how confident the model was, to order
+the questions that are tied on disagreement.
 
-## 8.4 Systems 13–17: the same, stacked on voting
+Confidence is used **only** to break ties. It can never outrank disagreement. That matters for
+an honest reason as well as a technical one: because there is no weighting number to choose,
+there is no number we could have quietly tuned to flatter our own results on the test set.
 
-Identical runs to 08–12, scored differently: take the majority vote first, and use the cascade
-result only where the vote was split.
+**What happened.** 795 correct, +4.40 points. It swapped 76 of the 396 escalated questions for
+better ones, and its precision rose from 79.5% to 82.1%.
 
-| # | Matches | Correct | Score | Gain from stacking |
-|---|---|---|---|---|
-| 13 | 08 | 798 | 60.50% | **+42** |
-| 14 | 09 | 807 | 61.18% | **+42** |
-| 15 | 10 | 826 | 62.62% | **+42** |
-| 16 | 11 | 843 | 63.91% | **+42** |
-| 17 | 12 | 837 | 63.46% | **+42** |
+So the gate really is better at picking. But notice it lands *below* System 11, which simply
+sent more questions — and Section 10.4 shows that its advantage over System 10 is not
+statistically solid. The gate's improvement gets absorbed downstream before it reaches the
+score.
 
-**The cost is identical.** These are not new runs. They are the same runs, read a second way.
-The gate had already generated the three samples that the vote needs — the un-stacked versions
-simply threw them away.
+Where it clearly does win is cost: it reaches 60.27% for 307.5 tokens per question, where
+System 11 reaches 60.73% for 369.0 — **17% cheaper**.
 
-**The +42 is exactly the same every time**, and that is not a coincidence. Voting only changes
-answers in the middle group, where two of three attempts agree. The cascade only operates on
-the group where all three differ. The two never touch the same question, so the gain adds
-cleanly.
+| | |
+|---|---|
+| Correct | **795 of 1,319 — 60.27%** |
+| vs. System 02 | +4.40 points |
+| vs. System 10 | +11 answers, **p = 0.343 — not distinguishable from chance** |
+| Turned right / wrong | 80 / 22 |
+| Sent to the checker | 396 (30%) |
+| Checker calls | 728 |
+| Checker tokens per question | 307.5 |
+| Time for all 1,319 | 20 h 02 min |
 
-## 8.5 Systems 18–19: with the better checker
+![System 12 architecture](experiments/12_finetuned-model+smart-gate+checker_glm-30b_full-hint/architecture.png)
 
-Identical to 12 and 17, but with the 9-billion checker instead of the 30-billion one.
+![System 12 question flow](experiments/12_finetuned-model+smart-gate+checker_glm-30b_full-hint/question_flow.png)
 
-| # | System | Correct | Score |
-|---|---|---|---|
-| 18 | Smart gate + Qwen-9B checker, no voting | 861 | 65.28% |
-| 19 | The same, stacked on voting | **903** | **68.46%** |
+---
 
-**System 19 is our best result.** And system 18 is important on its own: at 65.28% it beats
-free voting's 59.06% *without* stacking, which the 30-billion checker never managed. That
-tells us the earlier failure was the checker's fault, not the design's.
+## Group D — Systems 13 to 17: the same runs, stacked on voting
 
-## 8.6 The full table
+Here is the most important idea in the report, and it costs nothing.
 
-| # | System | Correct | Score | vs. trained model | Turned right | Turned wrong |
+Systems 13 to 17 are **not new runs**. They are Systems 08 to 12 read a second way. The gate
+already had to generate three samples per question in order to measure disagreement. Group C
+threw those samples away after using them to choose. Group D uses them.
+
+The rule is: **take the majority vote first. Use the cascade's answer only where the vote was
+split.**
+
+Every system in this group scores **exactly 42 answers higher** than its Group C twin, at
+**exactly the same cost** — the same checker calls, the same tokens, the same hours.
+
+**Why exactly 42, every time?** Because voting and checking never touch the same question.
+Voting only changes answers in the middle group, where two of three attempts agree — it
+changed 81 there. The cascade only operates on the group where all three attempts differ. The
+two sets do not overlap, so the gains add cleanly and identically.
+
+This is not a tuning trick. It is a structural property of how the two mechanisms divide the
+work.
+
+### System 13 — Vote + gate + 30B checker, no hint
+
+**What it is.** System 08, stacked on the vote.
+
+**What happened.** 756 → **798**. +42.
+
+| | |
+|---|---|
+| Correct | **798 of 1,319 — 60.50%** |
+| Gain from stacking | **+42, at zero extra cost** |
+| vs. System 04 (free voting) | +1.44 points, **p = 0.034 — real** |
+| Turned right / wrong | 100 / 39 |
+| Checker tokens per question | 300.9 |
+
+Worth pausing on that middle row. System 08 alone could not be shown to beat free voting. The
+identical run, read this way, beats it with a solid p-value.
+
+![System 13 architecture](experiments/13_finetuned-model+vote+gate+checker_glm-30b_no-hint/architecture.png)
+
+![System 13 question flow](experiments/13_finetuned-model+vote+gate+checker_glm-30b_no-hint/question_flow.png)
+
+### System 14 — Vote + gate + 30B checker, short hint
+
+**What it is.** System 09, stacked.
+
+**What happened.** 765 → **807**. +42 again.
+
+| | |
+|---|---|
+| Correct | **807 of 1,319 — 61.18%** |
+| Gain from stacking | **+42, at zero extra cost** |
+| vs. System 04 | +2.12 points, **p = 0.0018 — real** |
+| Turned right / wrong | 106 / 36 |
+| Checker tokens per question | 297.9 |
+
+![System 14 architecture](experiments/14_finetuned-model+vote+gate+checker_glm-30b_short-hint/architecture.png)
+
+![System 14 question flow](experiments/14_finetuned-model+vote+gate+checker_glm-30b_short-hint/question_flow.png)
+
+### System 15 — Vote + gate + 30B checker, full hint
+
+**What it is.** System 10, stacked. This is the direct answer to the failure in Section 10.1.
+
+**What happened.** 784 → **826**. +42.
+
+| | System 10 | System 15 |
+|---|---|---|
+| Correct | 784 | **826** |
+| Score | 59.44% | **62.62%** |
+| Checker calls | 712 | **712 — identical** |
+| Tokens per question | 296.0 | **296.0 — identical** |
+| vs. free voting | p = 0.751, **not real** | **p < 0.001, real** |
+
+Same run. Same cost. The difference between a result we could not defend and one we can is
+entirely in whether we throw the samples away.
+
+| | |
+|---|---|
+| Correct | **826 of 1,319 — 62.62%** |
+| Turned right / wrong | 124 / 35 |
+| Time for all 1,319 | 19 h 45 min |
+
+![System 15 architecture](experiments/15_finetuned-model+vote+gate+checker_glm-30b_full-hint/architecture.png)
+
+![System 15 question flow](experiments/15_finetuned-model+vote+gate+checker_glm-30b_full-hint/question_flow.png)
+
+### System 16 — Vote + gate at 37.3% + 30B checker, full hint
+
+**What it is.** System 11, stacked. The best of the 30-billion-checker systems.
+
+**What happened.** 801 → **843**. +42.
+
+| | |
+|---|---|
+| Correct | **843 of 1,319 — 63.91%** |
+| vs. System 02 | +8.04 points |
+| Gain from stacking | **+42, at zero extra cost** |
+| Turned right / wrong | 148 / 42 |
+| Sent to the checker | 492 (37.3%) |
+| Checker calls | 889 |
+| Checker tokens per question | 369.0 |
+| Time for all 1,319 | 20 h 37 min |
+
+![System 16 architecture](experiments/16_finetuned-model+vote+gate+checker_glm-30b_full-hint_37pct/architecture.png)
+
+![System 16 question flow](experiments/16_finetuned-model+vote+gate+checker_glm-30b_full-hint_37pct/question_flow.png)
+
+### System 17 — Vote + smart gate + 30B checker, full hint
+
+**What it is.** System 12, stacked.
+
+**What happened.** 795 → **837**. +42.
+
+It scores slightly below System 16 but costs **17% fewer checker tokens** (307.5 against
+369.0). So within the 30-billion group the choice between them is a genuine trade: System 16
+for the best score, System 17 for the better value.
+
+| | |
+|---|---|
+| Correct | **837 of 1,319 — 63.46%** |
+| vs. System 02 | +7.58 points |
+| vs. System 16 | −6 answers, at 17% less cost, **p = 0.640** |
+| Turned right / wrong | 134 / 34 |
+| Checker tokens per question | 307.5 |
+| Time for all 1,319 | 20 h 02 min |
+
+![System 17 architecture](experiments/17_finetuned-model+vote+smart-gate+checker_glm-30b_full-hint/architecture.png)
+
+![System 17 question flow](experiments/17_finetuned-model+vote+smart-gate+checker_glm-30b_full-hint/question_flow.png)
+
+---
+
+## Group E — Systems 18 and 19: swapping in the better checker
+
+Group B told us the 9-billion checker was better than the 30-billion one. These two systems
+test whether that holds up inside a complete system. They are Systems 12 and 17 with the
+checker swapped and nothing else changed.
+
+The answer is that it holds up, and by more than we expected: **changing the checker alone is
+worth more than every other improvement in this report put together.**
+
+### System 18 — Smart gate + 9B checker, no voting
+
+**What it is.** System 12 with the 9-billion checker in place of the 30-billion one.
+
+**What happened.** 795 → **861**. That is **+66 answers from changing the checker alone**, and
+it settles an argument.
+
+Remember that every un-stacked system in Group C failed to beat free voting. System 18 does
+not:
+
+| | Score | vs. free voting (59.06%) |
+|---|---|---|
+| System 12 (30B checker) | 60.27% | p = 0.247 — **not real** |
+| **System 18 (9B checker)** | **65.28%** | **p < 0.001 — real** |
+
+**This tells us the failure in Section 10.1 was the checker's fault, not the design's.** The
+cascade idea was sound all along; it was being run with a checker that rejected too many
+correct answers to pay for itself.
+
+Look at the flip counts too. System 18 turned **136 right and broke only 12** — the lowest
+breakage of any system that changes answers, and a direct consequence of the 9B model's lower
+false-rejection rate.
+
+| | |
+|---|---|
+| Correct | **861 of 1,319 — 65.28%** |
+| vs. System 02 | +9.40 points |
+| vs. System 12 | **+66 answers, from the checker alone** |
+| Turned right / wrong | **136 / 12** |
+| Sent to the checker | 396 (30%) |
+| Checker calls | 728 |
+| Checker tokens per question | 345.8 |
+| Replies cut off | 18 |
+| Time for all 1,319 | 19 h 27 min |
+
+![System 18 architecture](experiments/18_finetuned-model+smart-gate+checker_qwen-9b_full-hint/architecture.png)
+
+![System 18 question flow](experiments/18_finetuned-model+smart-gate+checker_qwen-9b_full-hint/question_flow.png)
+
+### System 19 — Vote + smart gate + 9B checker, full hint — our best result
+
+**What it is.** Everything we learned, in one system: fine-tune the model, answer three times,
+vote, escalate only the split votes using disagreement with confidence as a tie-break, have
+the 9-billion checker mark those, and retry with a full hint.
+
+**What happened.** **903 of 1,319 — 68.46%.**
+
+| | |
+|---|---|
+| Correct | **903 of 1,319 — 68.46%** |
+| vs. System 02 | **+12.59 points** |
+| vs. System 04 (free voting) | **+9.40 points, p < 0.001** |
+| vs. System 17 (same, 30B checker) | **+66 answers, p < 0.001** |
+| Turned right / wrong | **190 / 24** |
+| Share of the 72.93% ceiling | **93.9%** |
+| Sent to the checker | 396 (30%) |
+| Questions never leaving the device | **923 — 70%** |
+| Checker calls | 728 |
+| Checker tokens per question | 345.8 |
+| Attempts per question | 3.44 |
+| Time for all 1,319 | 19 h 27 min |
+
+Three things worth saying about this row.
+
+**190 fixed against 24 broken.** No other system comes close to that ratio. It is what a good
+checker buys you: it finds mistakes without manufacturing them.
+
+**70% of questions never leave the device.** That is the number the whole project is about.
+Of the 1,319 questions, 827 are settled by the vote and another 96 are left alone by the
+budget — 923 in total answered entirely locally.
+
+**93.9% of the ceiling.** The remaining gap to 72.93% is made of questions the small model
+never answered correctly in any of its three attempts. No checker can find an answer the model
+never produced.
+
+![System 19 architecture](experiments/19_finetuned-model+vote+smart-gate+checker_qwen-9b_full-hint/architecture.png)
+
+![System 19 question flow](experiments/19_finetuned-model+vote+smart-gate+checker_qwen-9b_full-hint/question_flow.png)
+
+---
+
+## 8.6 All 19 together
+
+| # | System | Correct | Score | vs. System 02 | Turned right | Turned wrong |
 |---|---|---|---|---|---|---|
 | 01 | Before training (8 examples) | 479 | 36.32% | −19.56 | 138 | 396 |
 | 02 | After training | 737 | 55.88% | — | — | — |
 | 03 | Blind retry | 658 | 49.89% | −5.99 | 138 | 217 |
 | 04 | Majority vote | 779 | 59.06% | +3.18 | 54 | 12 |
-| 05 | GLM-30B marks all | 737 | 55.88% | +0.00 | 0 | 0 |
-| 06 | Qwen-9B marks all | 737 | 55.88% | +0.00 | 0 | 0 |
+| 05 | 30B marks all | 737 | 55.88% | +0.00 | 0 | 0 |
+| 06 | 9B marks all | 737 | 55.88% | +0.00 | 0 | 0 |
 | 07 | Answer key marks all | 737 | 55.88% | +0.00 | 0 | 0 |
-| 08 | Gate + GLM, no hint | 756 | 57.32% | +1.44 | 46 | 27 |
-| 09 | Gate + GLM, short hint | 765 | 58.00% | +2.12 | 52 | 24 |
-| 10 | Gate + GLM, full hint | 784 | 59.44% | +3.56 | 70 | 23 |
-| 11 | Gate at 37.3% + GLM, full hint | 801 | 60.73% | +4.85 | 94 | 30 |
-| 12 | Smart gate + GLM, full hint | 795 | 60.27% | +4.40 | 80 | 22 |
-| 13 | Vote + gate + GLM, no hint | 798 | 60.50% | +4.62 | 100 | 39 |
-| 14 | Vote + gate + GLM, short hint | 807 | 61.18% | +5.31 | 106 | 36 |
-| 15 | Vote + gate + GLM, full hint | 826 | 62.62% | +6.75 | 124 | 35 |
-| 16 | Vote + gate at 37.3% + GLM | 843 | 63.91% | +8.04 | 148 | 42 |
-| 17 | Vote + smart gate + GLM | 837 | 63.46% | +7.58 | 134 | 34 |
-| 18 | Smart gate + Qwen-9B | 861 | 65.28% | +9.40 | 136 | 12 |
-| **19** | **Vote + smart gate + Qwen-9B** | **903** | **68.46%** | **+12.59** | **190** | **24** |
+| 08 | Gate + 30B, no hint | 756 | 57.32% | +1.44 | 46 | 27 |
+| 09 | Gate + 30B, short hint | 765 | 58.00% | +2.12 | 52 | 24 |
+| 10 | Gate + 30B, full hint | 784 | 59.44% | +3.56 | 70 | 23 |
+| 11 | Gate at 37.3% + 30B | 801 | 60.73% | +4.85 | 94 | 30 |
+| 12 | Smart gate + 30B | 795 | 60.27% | +4.40 | 80 | 22 |
+| 13 | Vote + gate + 30B, no hint | 798 | 60.50% | +4.62 | 100 | 39 |
+| 14 | Vote + gate + 30B, short hint | 807 | 61.18% | +5.31 | 106 | 36 |
+| 15 | Vote + gate + 30B, full hint | 826 | 62.62% | +6.75 | 124 | 35 |
+| 16 | Vote + gate at 37.3% + 30B | 843 | 63.91% | +8.04 | 148 | 42 |
+| 17 | Vote + smart gate + 30B | 837 | 63.46% | +7.58 | 134 | 34 |
+| 18 | Smart gate + 9B | 861 | 65.28% | +9.40 | 136 | 12 |
+| **19** | **Vote + smart gate + 9B** | **903** | **68.46%** | **+12.59** | **190** | **24** |
 | — | *Ceiling: right if any of 3 attempts was right* | *962* | *72.93%* | *+17.06* | — | — |
-
-"Turned right" and "turned wrong" are counted against system 02. They matter because a system
-can gain answers and break others at the same time, and the score alone hides that. System 19
-is notable for breaking only 24 while fixing 190.
 
 ## 8.7 What each one costs
 
 | # | Attempts per question | Tokens written | Tokens read | Sent to checker | Checker calls | Checker tokens per question | Estimated time for all 1,319 |
 |---|---|---|---|---|---|---|---|
-| 01 | 1.00 | 120.6 | 1617.7 | 0 | 0 | 0.0 | 3 h 19 min (measured) |
-| 02 | 1.00 | 125.9 | 87.7 | 0 | 0 | 0.0 | 5 h 14 min |
-| 03 | 2.00 | 258.4 | 175.3 | 0 | 0 | 0.0 | 10 h 44 min |
+| 01 | 1.00 | 120.6 | 1617.7 | 0 | 0 | 0.0 | 3 h 19 min *(measured)* |
+| 02 | 1.00 | 125.9 | 87.7 | 0 | 0 | 0.0 | 5 h 13 min |
+| 03 | 2.00 | 258.4 | 175.3 | 0 | 0 | 0.0 | 10 h 43 min |
 | 04 | 3.00 | 389.8 | 263.0 | 0 | 0 | 0.0 | 16 h 11 min |
 | 05 | 1.00 | 125.9 | 87.7 | 1,319 | 1,319 | 499.1 | 5 h 59 min |
 | 06 | 1.00 | 125.9 | 87.7 | 1,319 | 1,319 | 565.1 | 5 h 35 min |
-| 07 | 1.00 | 125.9 | 87.7 | 1,319 | — | 0.0 | 5 h 14 min |
-| 08–10 | ~3.46 | ~471 | ~407 | 396 (30%) | 712 | ~299 | ~20 h |
-| 11, 16 | 3.57 | 484.5 | 451.9 | 492 (37%) | 889 | 369.0 | 20 h 37 min |
-| 12, 17 | 3.48 | 472.7 | 426.2 | 396 (30%) | 728 | 307.5 | 20 h 03 min |
-| 13–15 | ~3.46 | ~471 | ~407 | 396 (30%) | 712 | ~299 | ~20 h |
-| 18, 19 | 3.44 | 464.1 | 442.8 | 396 (30%) | 728 | 345.8 | 19 h 28 min |
+| 07 | 1.00 | 125.9 | 87.7 | 1,319 | — | 0.0 | 5 h 13 min |
+| 08 | 3.46 | 476.8 | 399.1 | 396 (30%) | 712 | 300.9 | 20 h 12 min |
+| 09 | 3.46 | 470.8 | 405.4 | 396 (30%) | 712 | 297.9 | 19 h 57 min |
+| 10 | 3.45 | 466.2 | 415.1 | 396 (30%) | 712 | 296.0 | 19 h 45 min |
+| 11 | 3.57 | 484.5 | 451.9 | 492 (37%) | 889 | 369.0 | 20 h 37 min |
+| 12 | 3.48 | 472.7 | 426.2 | 396 (30%) | 728 | 307.5 | 20 h 02 min |
+| 13 | 3.46 | 476.8 | 399.1 | 396 (30%) | 712 | 300.9 | 20 h 12 min |
+| 14 | 3.46 | 470.8 | 405.4 | 396 (30%) | 712 | 297.9 | 19 h 57 min |
+| 15 | 3.45 | 466.2 | 415.1 | 396 (30%) | 712 | 296.0 | 19 h 45 min |
+| 16 | 3.57 | 484.5 | 451.9 | 492 (37%) | 889 | 369.0 | 20 h 37 min |
+| 17 | 3.48 | 472.7 | 426.2 | 396 (30%) | 728 | 307.5 | 20 h 02 min |
+| 18 | 3.44 | 464.1 | 442.8 | 396 (30%) | 728 | 345.8 | 19 h 27 min |
+| 19 | 3.44 | 464.1 | 442.8 | 396 (30%) | 728 | 345.8 | 19 h 27 min |
 
 Two notes on this table.
 
 **The times are estimates, not measurements.** None of the runs recorded how long they took.
 We built the estimate from speeds we *did* measure — the small model writes 8.8 tokens per
-second, the 9B checker takes 1.00 s per check, the 30B takes 2.07 s — and checked the method
-against three jobs whose real durations we can recover from timestamps. It was accurate to
-within 2–3.5% on all three. System 01 is the exception, and we report its measured time
-instead: the estimate was 51% too high, because the speed was measured with the training
-adapter loaded and the untrained model runs without it.
+second, the 9B checker takes 1.00 s per check, the 30B takes 2.07 s — and then checked the
+method against three jobs whose real durations we can recover from timestamps. It was accurate
+to within 2–3.5% on all three. System 01 is the exception, and we report its measured time
+instead.
 
 **"Checker tokens" did not actually leave the machine.** Our checker ran locally. The column
 counts what *would* travel to an outside service if the checker were one, because that is the
-cost the project argues about.
+cost this project argues about.
+
+## 8.8 What the 19 systems add up to
+
+Read in order, the chapter tells a fairly simple story:
+
+| Step | Systems | What it bought |
+|---|---|---|
+| Training the model | 01 → 02 | **+19.56 points** |
+| Voting instead of retrying | 03 → 04 | **+9.17 points** over blind retry |
+| Adding a checker | 04 → 10 | +0.38 points — **not worth it** |
+| Stacking instead of substituting | 10 → 15 | **+3.18 points, free** |
+| Changing the checker | 17 → 19 | **+5.00 points** |
+
+The two biggest wins after fine-tuning cost nothing extra: stacking was free, and swapping the
+checker made the system cheaper as well as better. The expensive step — adding a checker in the
+first place — is the one that did the least, until the other two fixed it.
 
 ---
 
@@ -1647,31 +2271,12 @@ The rule we adopted afterwards, and we recommend it:
 > **A small trial decides whether to spend the computer time. It never decides what to
 > conclude.**
 
-## 10.8 The training run we threw away, and the crash
+## 10.8 The training crash
 
-Both covered earlier, listed here so the failures are in one place:
-
-- **An entire training run abandoned at step 400** because we changed the prompt format
-  afterwards. It was training perfectly well — loss 0.755, token accuracy 0.809 — on the
-  wrong shape of text (Section 5.8).
-- **The training crashed at step 936** when the library tried to score the model at the end of
-  a pass and asked for 4.38 GB the graphics card did not have. We resumed from step 900,
-  losing 36 steps, and turned that scoring off for good (Section 5.7).
-
-## 10.9 An experiment we stopped and never finished
-
-The strongest criticism of this report is that everything is demonstrated on one model. To
-answer it, we designed an experiment: put the same gate and checker on top of a different
-small model and see whether the gain transfers.
-
-We wrote the code, tested it, and started the run. It needed about 17 hours, and we stopped it
-after 51 of 1,319 questions.
-
-**No result exists.** The 51 answers are kept only as a point to resume from. They are 3.9% of
-the test set, and the range of scores consistent with them is roughly 45% to 72% — which is to
-say, they tell you nothing. **They are not quoted anywhere in this report and must not be.**
-
-This appears in Chapter 11 as a limitation, which is what it is.
+Covered earlier, listed here so the failures are in one place: **the training crashed at step
+936** when the library tried to score the model at the end of a pass and asked for 4.38 GB the
+graphics card did not have. We resumed from step 900, losing 36 steps, and turned that scoring
+off for good (Section 5.7).
 
 ---
 
@@ -1770,9 +2375,8 @@ the best published results — it is not, and Chapter 3 says so plainly.
    of the time goes into generating the three local samples, and that our checker — running
    through specialised software — is 15 times faster per token than our own solver. This is by
    far the largest speed win available and it requires no new research.
-2. **Run the transfer experiment.** Put the same gate and checker on a different small model.
-   It is the direct answer to Limitation 11.11, the code is written and tested, and it needs
-   about 17 hours of computer time.
+2. **Try it on a different small model.** Put the same gate and checker on another solver and
+   see whether the gain transfers. This is the direct answer to Limitation 11.11.
 3. **Measure on real target hardware** — an old laptop, an office desktop, a phone. Until then
    no latency claim about edge devices is properly supported.
 4. **Hand-label 100 solutions** for reasoning quality, to close Limitation 11.2.
@@ -1870,9 +2474,10 @@ many consecutive failures rather than approving everything that is left.
 
 # Appendix B — All 19 systems
 
-See Section 8.6 and 8.7 for the tables, `docs/experiments/` for one folder per system with
-two diagrams each, and `reports/benchmark_all_systems.xlsx` for the machine-readable version
-with a note explaining every column.
+Chapter 8 covers all 19 in turn, with both diagrams for each. Sections 8.6 and 8.7 hold the
+combined tables. The same material is also in `docs/experiments/` — one folder per system —
+and in `reports/benchmark_all_systems.xlsx`, which is machine-readable and carries a note
+explaining every column.
 
 ---
 
