@@ -291,7 +291,7 @@ verdicts replayed identically across runs made a day apart.
 
 ## F. The cascade, and stacking
 
-![Per-question data flow](../reports/figures/technical/fig2_per_question_data_flow.png)
+![Per-question data flow](diagram_images/fig_dataflow_system19.png)
 
 **Fig. 3.** Per-question data flow across the full test set (*n* = 1,319). All counts are
 measured. 923 questions (70%) are resolved entirely on-device.
