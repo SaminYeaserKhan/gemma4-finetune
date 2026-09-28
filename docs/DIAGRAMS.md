@@ -86,9 +86,9 @@ flowchart TB
     CHECK -->|"a yes or no, plus one sentence<br/>saying where it went wrong<br/>(never the answer itself)"| SOLVER
     VOTE --> OUT["<b>The answer you see</b><br/>always written by the small AI<br/>on your own machine"]
 
-    style DEV fill:#e8f4ea,stroke:#2d6a4f,stroke-width:2px
-    style OFF fill:#fdf0e6,stroke:#b5651d,stroke-width:2px
-    style OUT fill:#e6eefc,stroke:#2b4c8c,stroke-width:2px
+    style DEV fill:#eaf7ff,stroke:#46bbfe,stroke-width:2px
+    style OFF fill:#fff2e3,stroke:#f0a04b,stroke-width:2px
+    style OUT fill:#86e5a1,stroke:#009d25,stroke-width:2px
 ```
 
 **The point of this figure:** everything is inside the green box except one thing. The
@@ -127,9 +127,9 @@ flowchart TD
     RETRY --> FINAL["<b>The answer you see</b>"]
     KEEP --> FINAL
 
-    style KEEP fill:#e8f4ea,stroke:#2d6a4f
-    style JUDGE fill:#fdf0e6,stroke:#b5651d
-    style FINAL fill:#e6eefc,stroke:#2b4c8c,stroke-width:2px
+    style KEEP fill:#eaf7ff,stroke:#46bbfe
+    style JUDGE fill:#fff2e3,stroke:#f0a04b
+    style FINAL fill:#86e5a1,stroke:#009d25,stroke-width:2px
 ```
 
 **Two things to say about this figure in the text:**
@@ -155,7 +155,7 @@ flowchart TD
 > self-consistency.
 
 ```mermaid
-flowchart LR
+flowchart TB
     W["<b>The small AI got<br/>a question wrong.</b><br/>Why?"] --> T{"Which kind of<br/>mistake was it?"}
 
     T -->|"It does know how to do<br/>this. It was just careless<br/>on this attempt."| A["Its other two attempts<br/>got it right"]
@@ -167,9 +167,9 @@ flowchart LR
     AV --> R["<b>So do both, in this order</b><br/>keep the most common answer first,<br/>and only ask for help on the<br/>questions where all three disagreed<br/><br/><b>59.4% → 62.6% correct,</b><br/>with no extra internet use at all"]
     BV --> R
 
-    style AV fill:#e8f4ea,stroke:#2d6a4f
-    style BV fill:#fdf0e6,stroke:#b5651d
-    style R fill:#e6eefc,stroke:#2b4c8c,stroke-width:2px
+    style AV fill:#eaf7ff,stroke:#46bbfe
+    style BV fill:#fff2e3,stroke:#f0a04b
+    style R fill:#86e5a1,stroke:#009d25,stroke-width:2px
 ```
 
 **Say in the text:** used *instead of* comparing the three attempts, the marker gave no
@@ -202,8 +202,8 @@ flowchart TD
     G1 -.->|"never sent while<br/>harder ones are waiting"| PICK
     G2 -.-> PICK
 
-    style G3 fill:#fdf0e6,stroke:#b5651d
-    style PICK fill:#e6eefc,stroke:#2b4c8c,stroke-width:2px
+    style G3 fill:#fff2e3,stroke:#f0a04b
+    style PICK fill:#86e5a1,stroke:#009d25,stroke-width:2px
 ```
 
 **Why it is built this way.** The first clue can only ever say one of three things, so
@@ -241,9 +241,9 @@ flowchart TD
     SUP --> AN["<b>analyze_supervision.py</b><br/>counts everything up and<br/>builds the tables and charts"]
     AN --> REP[("The tables and figures<br/>that go in the paper")]
 
-    style TRAIN fill:#e8f4ea,stroke:#2d6a4f
-    style SUP fill:#e6eefc,stroke:#2b4c8c,stroke-width:2px
-    style SERVE fill:#fdf0e6,stroke:#b5651d
+    style TRAIN fill:#eaf7ff,stroke:#46bbfe
+    style SUP fill:#86e5a1,stroke:#009d25,stroke-width:2px
+    style SERVE fill:#fff2e3,stroke:#f0a04b
 ```
 
 **Worth one sentence in the text:** the small AI's first attempt at each question was
@@ -263,7 +263,7 @@ them is caused by the thing we changed, not by the AI happening to have a better
 > rejections worse. Supervisor capability is not monotonically beneficial.
 
 ```mermaid
-flowchart LR
+flowchart TB
     L1["<b>The small AI marking<br/>its own work</b><br/>Catches only 22 of every<br/>100 wrong answers.<br/>It approves almost anything<br/>it wrote itself."]
     L2["<b>A medium AI as marker</b><br/>(9 billion)<br/>Catches 89 of every 100<br/>wrong answers.<br/>But wrongly fails 19 of every<br/>100 answers that were right.<br/><br/><b>BEST OVERALL</b><br/>and nearly twice as fast"]
     L3["<b>A large AI as marker</b><br/>(30 billion)<br/>Catches a few more errors,<br/>but wrongly fails <b>26</b> of every<br/>100 answers that were right.<br/><br/><b>WORSE, despite being bigger</b>"]
@@ -273,9 +273,9 @@ flowchart LR
     L2 -->|"<b>goes backwards</b>"| L3
     L3 -.->|"for reference only"| L4
 
-    style L2 fill:#e8f4ea,stroke:#2d6a4f,stroke-width:2px
-    style L3 fill:#fdece9,stroke:#b03a2e
-    style L4 fill:#eeeeee,stroke:#888,stroke-dasharray: 4 4
+    style L2 fill:#eaf7ff,stroke:#46bbfe,stroke-width:2px
+    style L3 fill:#ffd9d4,stroke:#e06a5a
+    style L4 fill:#f2f2f2,stroke:#9a9a9a,stroke-dasharray: 4 4
 ```
 
 **The sentence this figure exists to support:** *there is a size of marker that fits the

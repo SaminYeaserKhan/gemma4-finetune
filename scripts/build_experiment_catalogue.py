@@ -477,11 +477,11 @@ def architecture(s: System) -> str:
         if s.stacked:
             lines.append("    VOTE -->|agreed answers| OUT")
     lines += tail
-    lines += ["    style DEV fill:#e8f4ea,stroke:#2d6a4f,stroke-width:2px"]
+    lines += ["    style DEV fill:#eaf7ff,stroke:#46bbfe,stroke-width:2px"]
     if s.kind in ("marking", "cascade") and s.checker != "oracle":
-        lines.append("    style OFF fill:#fdf0e6,stroke:#b5651d,stroke-width:2px")
+        lines.append("    style OFF fill:#fff2e3,stroke:#f0a04b,stroke-width:2px")
     if s.checker == "oracle" and s.kind == "marking":
-        lines.append("    style KEY fill:#eeeeee,stroke:#888,stroke-dasharray: 4 4")
+        lines.append("    style KEY fill:#f2f2f2,stroke:#9a9a9a,stroke-dasharray: 4 4")
     return "\n".join(lines)
 
 
@@ -507,7 +507,7 @@ def question_flow(s: System) -> str:
               f'    D -->|"two of three matched<br/><b>{g[2]}</b>"| K',
               f'    D -->|"all three differed<br/><b>{g[3]}</b>"| F["No most-common answer,<br/>so keep the first attempt"]',
               "    K --> RES", "    F --> RES", end,
-              "    style K fill:#e8f4ea,stroke:#2d6a4f"]
+              "    style K fill:#eaf7ff,stroke:#46bbfe"]
     elif s.kind == "marking" and s.checker == "oracle":
         L += ['    Q --> A["The small AI answers each question once"]',
               f'    A --> M["<b>Each answer is compared with the answer key</b><br/>'
@@ -517,7 +517,7 @@ def question_flow(s: System) -> str:
               '    OK --> SAME["<b>No answer is changed.</b><br/>This experiment shows the best score any<br/>'
               'marker could reach, and checks that our<br/>scoring code is correct."]',
               "    NO --> SAME", "    SAME --> RES", end,
-              "    style M fill:#eeeeee,stroke:#888,stroke-dasharray: 4 4"]
+              "    style M fill:#f2f2f2,stroke:#9a9a9a,stroke-dasharray: 4 4"]
     elif s.kind == "marking":
         L += ['    Q --> A["The small AI answers each question once"]',
               f'    A --> M["<b>The marker grades all {total:,} answers</b>"]',
@@ -527,7 +527,7 @@ def question_flow(s: System) -> str:
               f'    NO --> NR["<b>{f["rejected_right"]}</b> were actually right<br/>a mistake by the marker"]',
               '    OK --> SAME["<b>No answer is changed</b><br/>the score stays the same"]',
               "    NW --> SAME", "    NR --> SAME", "    SAME --> RES", end,
-              "    style M fill:#fdf0e6,stroke:#b5651d", "    style NR fill:#fdece9,stroke:#b03a2e"]
+              "    style M fill:#fff2e3,stroke:#f0a04b", "    style NR fill:#ffd9d4,stroke:#e06a5a"]
     else:
         g = f["groups"]
         if s.stacked:
@@ -553,8 +553,8 @@ def question_flow(s: System) -> str:
               f'    R1 -->|"marker now says right<br/><b>{f["retried_once"]}</b>"| KEEP2',
               f'    R1 -->|"still wrong<br/><b>{f["retried_twice"]}</b>"| R2["One last try,<br/>kept without checking"]',
               "    K --> RES", "    KEEP2 --> RES", "    R2 --> RES", end,
-              "    style K fill:#e8f4ea,stroke:#2d6a4f", "    style M fill:#fdf0e6,stroke:#b5651d"]
-    L.append("    style RES fill:#e6eefc,stroke:#2b4c8c,stroke-width:2px")
+              "    style K fill:#eaf7ff,stroke:#46bbfe", "    style M fill:#fff2e3,stroke:#f0a04b"]
+    L.append("    style RES fill:#86e5a1,stroke:#009d25,stroke-width:2px")
     return "\n".join(L)
 
 

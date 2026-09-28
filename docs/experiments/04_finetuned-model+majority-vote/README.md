@@ -48,7 +48,7 @@ flowchart TB
         SOLVER -->|three attempts| VOTE
     end
     VOTE --> OUT["<b>The answer you see</b>"]
-    style DEV fill:#e8f4ea,stroke:#2d6a4f,stroke-width:2px
+    style DEV fill:#eaf7ff,stroke:#46bbfe,stroke-width:2px
 ```
 
 ```mermaid
@@ -62,8 +62,8 @@ flowchart TD
     K --> RES
     F --> RES
     RES["<b>779 right</b> (59.1%)<br/>540 wrong"]
-    style K fill:#e8f4ea,stroke:#2d6a4f
-    style RES fill:#e6eefc,stroke:#2b4c8c,stroke-width:2px
+    style K fill:#eaf7ff,stroke:#46bbfe
+    style RES fill:#86e5a1,stroke:#009d25,stroke-width:2px
 ```
 
 </details>

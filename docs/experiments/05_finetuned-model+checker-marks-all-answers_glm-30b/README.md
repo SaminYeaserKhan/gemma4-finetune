@@ -63,8 +63,8 @@ flowchart TB
     end
     ONE -->|every answer| CHECK
     CHECK --> SCORE["<b>A mark for every answer</b><br/>the answer is never changed:<br/>this measures the marking, not the system"]
-    style DEV fill:#e8f4ea,stroke:#2d6a4f,stroke-width:2px
-    style OFF fill:#fdf0e6,stroke:#b5651d,stroke-width:2px
+    style DEV fill:#eaf7ff,stroke:#46bbfe,stroke-width:2px
+    style OFF fill:#fff2e3,stroke:#f0a04b,stroke-width:2px
 ```
 
 ```mermaid
@@ -81,9 +81,9 @@ flowchart TD
     NR --> SAME
     SAME --> RES
     RES["<b>737 right</b> (55.9%)<br/>582 wrong"]
-    style M fill:#fdf0e6,stroke:#b5651d
-    style NR fill:#fdece9,stroke:#b03a2e
-    style RES fill:#e6eefc,stroke:#2b4c8c,stroke-width:2px
+    style M fill:#fff2e3,stroke:#f0a04b
+    style NR fill:#ffd9d4,stroke:#e06a5a
+    style RES fill:#86e5a1,stroke:#009d25,stroke-width:2px
 ```
 
 </details>

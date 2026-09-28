@@ -291,7 +291,7 @@ verdicts replayed identically across runs made a day apart.
 
 ## F. The cascade, and stacking
 
-![Per-question data flow](diagram_images/fig_dataflow_system19.png)
+![Per-question data flow](../reports/figures/technical/fig2_per_question_data_flow.png)
 
 **Fig. 3.** Per-question data flow across the full test set (*n* = 1,319). All counts are
 measured. 923 questions (70%) are resolved entirely on-device.
@@ -453,8 +453,10 @@ now treat small trials as budget decisions only.
 
 ![Accuracy against off-device cost](../reports/figures/pareto.png)
 
-**Fig. 6.** Accuracy against off-device tokens per question. Hollow markers denote dominated
-configurations.
+**Fig. 6.** Each row is one configuration, scored twice: the light marker is the checker used
+*instead of* the majority vote, the dark marker the identical run *stacked on* it. Every pair
+differs by exactly +42 answers at identical cost. The off-device cost of each configuration is
+given in the right-hand column. The fine-tuned model alone, not shown, scores 55.88%.
 
 The best configuration reaches **68.46% — 93.9% of the pass@3 ceiling**, with **70% of
 questions resolved entirely on-device** and a mean of 345.8 off-device tokens per question

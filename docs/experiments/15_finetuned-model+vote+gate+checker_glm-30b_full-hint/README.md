@@ -57,8 +57,8 @@ flowchart TB
     CHECK -->|"if wrong: it says which step went wrong<br/>and how to read the question<br/>(never the answer)"| SOLVER
     SOLVER --> OUT["<b>The answer you see</b><br/>always written by the small AI"]
     VOTE -->|agreed answers| OUT
-    style DEV fill:#e8f4ea,stroke:#2d6a4f,stroke-width:2px
-    style OFF fill:#fdf0e6,stroke:#b5651d,stroke-width:2px
+    style DEV fill:#eaf7ff,stroke:#46bbfe,stroke-width:2px
+    style OFF fill:#fff2e3,stroke:#f0a04b,stroke-width:2px
 ```
 
 ```mermaid
@@ -79,9 +79,9 @@ flowchart TD
     KEEP2 --> RES
     R2 --> RES
     RES["<b>826 right</b> (62.6%)<br/>493 wrong"]
-    style K fill:#e8f4ea,stroke:#2d6a4f
-    style M fill:#fdf0e6,stroke:#b5651d
-    style RES fill:#e6eefc,stroke:#2b4c8c,stroke-width:2px
+    style K fill:#eaf7ff,stroke:#46bbfe
+    style M fill:#fff2e3,stroke:#f0a04b
+    style RES fill:#86e5a1,stroke:#009d25,stroke-width:2px
 ```
 
 </details>

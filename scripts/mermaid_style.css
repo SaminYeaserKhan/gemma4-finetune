@@ -1,0 +1,64 @@
+/* Match the hand-drawn Canva diagrams in docs/diagram_images.
+ *
+ * Passed to mermaid-cli with -C, which injects it as Mermaid's themeCSS inside
+ * the headless browser. `rx`/`ry` are presentation attributes that CSS can set,
+ * which is how every rectangle gets the rounded corner the hand-drawn set uses
+ * -- Mermaid has no theme variable for it, and node shape is otherwise fixed by
+ * the source syntax.
+ */
+
+/* Rounded corners on every node and cluster. */
+.node rect,
+.node polygon,
+.cluster rect {
+  rx: 14px;
+  ry: 14px;
+}
+
+/* Node outlines: the Canva set uses a mid blue, a little thicker than default. */
+.node rect,
+.node circle,
+.node ellipse,
+.node polygon,
+.node path {
+  stroke: #46bbfe;
+  stroke-width: 2.2px;
+}
+
+/* Arrows. */
+.edgePath .path,
+.flowchart-link {
+  stroke: #46bbfe;
+  stroke-width: 2.2px;
+}
+marker path,
+.marker {
+  fill: #46bbfe !important;
+  stroke: #46bbfe !important;
+}
+
+/* Edge labels sit on the line in the hand-drawn set: small, grey, no box. */
+.edgeLabel {
+  background-color: #ffffff;
+  color: #333333;
+  font-size: 17px;
+}
+.edgeLabel rect {
+  fill: #ffffff;
+  opacity: 0.95;
+}
+
+/* Cluster (subgraph) titles. */
+.cluster text,
+.cluster span {
+  font-size: 18px;
+  fill: #333333;
+}
+
+/* Node text: black, and large enough to survive being scaled into a column. */
+.nodeLabel,
+.node text,
+.node span {
+  color: #000000;
+  fill: #000000;
+}

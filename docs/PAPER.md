@@ -2014,8 +2014,11 @@ wide. Chapter 10 explains why we do not take small trials very seriously any mor
 
 ![Accuracy against cost](../reports/figures/pareto.png)
 
-*Figure 9.2: Accuracy against how many checker tokens each question costs. Hollow markers are
-configurations that another configuration beats on both measures at once.*
+*Figure 9.2: Every system we built with a checker, best at the top. Each row is scored twice:
+the pale dot is the checker used **instead of** the majority vote, the dark dot is the very
+same run with the vote taken first. The gap between them is always exactly 42 answers, and it
+costs nothing. The right-hand column is how many words that system sends off the device. The
+trained model on its own, not shown here, scores 55.9%.*
 
 **68.46%, which is 93.9% of everything that was achievable.**
 

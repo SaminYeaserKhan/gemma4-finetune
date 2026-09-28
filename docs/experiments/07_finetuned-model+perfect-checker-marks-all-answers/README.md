@@ -58,8 +58,8 @@ flowchart TB
         ONE --> KEY
     end
     KEY --> SCORE["<b>A mark for every answer</b><br/>the answer is never changed:<br/>this measures the marking, not the system"]
-    style DEV fill:#e8f4ea,stroke:#2d6a4f,stroke-width:2px
-    style KEY fill:#eeeeee,stroke:#888,stroke-dasharray: 4 4
+    style DEV fill:#eaf7ff,stroke:#46bbfe,stroke-width:2px
+    style KEY fill:#f2f2f2,stroke:#9a9a9a,stroke-dasharray: 4 4
 ```
 
 ```mermaid
@@ -73,8 +73,8 @@ flowchart TD
     NO --> SAME
     SAME --> RES
     RES["<b>737 right</b> (55.9%)<br/>582 wrong"]
-    style M fill:#eeeeee,stroke:#888,stroke-dasharray: 4 4
-    style RES fill:#e6eefc,stroke:#2b4c8c,stroke-width:2px
+    style M fill:#f2f2f2,stroke:#9a9a9a,stroke-dasharray: 4 4
+    style RES fill:#86e5a1,stroke:#009d25,stroke-width:2px
 ```
 
 </details>

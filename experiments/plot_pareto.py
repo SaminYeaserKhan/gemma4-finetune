@@ -1,179 +1,177 @@
-"""The headline figure: accuracy against cloud tokens per question.
-
-The thesis argues that a supervisor is worth calling only if it buys accuracy
-that a free on-device method cannot. That claim lives or dies on one picture,
-and the picture has to include the free controls or it is not an argument --
-it is a chart of the cascade agreeing with itself.
-
-Three things are drawn deliberately:
-
-- **The free control line** at self-consistency@3. Every point below it is a
-  configuration that paid cloud tokens for nothing. Before the stacked arm
-  (dossier 5.7.3) every cascade point sat on it.
-- **The pass@3 ceiling.** No verifier can find an answer the local model never
-  produced, so this bounds the whole study.
-- **The Pareto frontier**, which is the only part a deployer would read: the
-  points where nothing else is at least as accurate for no more cost.
-
-Reads reports/fydp3_summary.csv so the figure cannot drift from the table.
+"""Draw the headline results figure from reports/fydp3_summary.csv.
 
     python experiments/plot_pareto.py
+
+This was a scatter of accuracy against cost, and it did not work. Nothing sits
+between 0 and 296 off-device tokens, and four of the six configurations fall
+within eleven tokens of each other, so ten of the twelve points piled into a
+sliver of the axis and every label collided with its neighbour's. Breaking the
+axis helped and still left a chart that needed a paragraph of explanation.
+
+The form here follows the data's job rather than the two measures. Each
+configuration has a *before* and an *after* -- the same run scored without and
+with the majority vote taken first -- which is a dumbbell, one row per
+configuration, one hue in two shades. Rows cannot collide, so the crowding
+problem cannot come back.
+
+Cost stays out of the geometry and is printed as a column. Two measures on two
+scales in one plot is the classic misleading chart; as a column the number is
+exact and the axis stays honest.
+
+Palette checked with the dataviz validator: #0b5d9e / #46bbfe / #c2691f pass
+the lightness, chroma, CVD-separation and normal-vision checks on a light
+surface. The mid blue carries a contrast warning, which the axis labels and the
+accompanying table relieve.
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 
-Point = tuple[str, float, float]  # label, cloud tokens/q, accuracy
+REPO = Path(__file__).resolve().parent.parent
+
+AFTER = "#0b5d9e"     # stacked on the vote
+BEFORE = "#46bbfe"    # used instead of the vote
+FREE = "#c2691f"      # the free control
+MUTED = "#6b6b6b"
+INK = "#1a1a1a"
+
+# (un-stacked key, stacked key, row label) -- plain names, not run names.
+ROWS = [
+    ("BEST-qwen9b", "BEST-qwen9b + voting", "9B checker"),
+    ("more-escalation", "more-escalation + voting", "30B, asked more often"),
+    ("smart-gate", "smart-gate + voting", "30B, better picking"),
+    ("hint-full", "hint-full + voting", "30B, full hint"),
+    ("hint-short", "hint-short + voting", "30B, short hint"),
+    ("hint-none", "hint-none + voting", "30B, no hint"),
+]
 
 
-def pareto_frontier(points: list[Point]) -> list[Point]:
-    """Points nothing else beats on both cost and accuracy, cheapest first.
-
-    Ties on both axes collapse to one point: two identical operating points
-    are the same choice, and drawing both puts a visible doubled marker on the
-    frontier that readers take for two distinct configurations.
-    """
-    frontier: list[Point] = []
-    for point in sorted(points, key=lambda p: (p[1], -p[2])):
-        if frontier and point[2] <= frontier[-1][2]:
-            continue
-        frontier.append(point)
-    return frontier
-
-
-def load_points(csv_path: Path) -> list[Point]:
-    points = []
-    with csv_path.open(encoding="utf-8-sig", newline="") as handle:
+def load(path: Path) -> dict[str, tuple[float, float, int]]:
+    rows = {}
+    with path.open(encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
-            cost, accuracy = row.get("cloud_tokens_per_q"), row.get("accuracy")
-            if not cost or not accuracy:
-                continue
-            points.append((row["condition"], float(cost), float(accuracy)))
-    return points
+            rows[row["condition"]] = (
+                float(row["cloud_tokens_per_q"]),
+                float(row["accuracy"]),
+                int(row["correct"]),
+            )
+    return rows
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--summary", default="reports/fydp3_summary.csv")
-    parser.add_argument("--output", default="reports/figures/pareto.png")
-    args = parser.parse_args()
+def draw(data: dict, out: Path) -> None:
+    plt.rcParams.update({
+        "font.family": "DejaVu Sans",
+        "font.size": 13,
+        "text.color": INK,
+        "axes.labelcolor": INK,
+        "xtick.color": INK,
+        "ytick.color": INK,
+    })
 
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    vote = data["self-consistency@3 (majority)"][1]
+    solo = data["local only (1 sample)"][1]
+    ceiling = data["pass@3 CEILING"][1]
 
-    points = load_points(Path(args.summary))
-    by_label = {label: (cost, accuracy) for label, cost, accuracy in points}
+    ordered = sorted(ROWS, key=lambda r: data[r[1]][1])   # worst at the bottom
+    fig, ax = plt.subplots(figsize=(9.0, 4.9))
 
-    ceiling = by_label.get("pass@3 CEILING")
-    control = by_label.get("self-consistency@3 (majority)")
-    local = by_label.get("local only (1 sample)")
-    # The ceiling and the blind-retry control are reference lines, not
-    # operating points -- nobody can deploy "pass@3", it needs the gold answer.
-    excluded = {"pass@3 CEILING", "blind retry, take last"}
-    operating = [p for p in points if p[0] not in excluded]
+    # --- reference lines -------------------------------------------------
+    # Two reference lines, not three. The fine-tuned model's own 55.9% sits
+    # three points from the free vote, so its caption could not be placed
+    # without colliding; it belongs in the caption and in Table III instead.
+    ax.axvspan(0.54, vote, color=FREE, alpha=0.05, zorder=0)
+    top = len(ordered)
+    for value, colour, text, ha, x, y in (
+        (vote, FREE, f"free: ask 3 times,\nkeep the majority — {vote:.0%}",
+         "left", vote + 0.004, top + 0.18),
+        # Tucked below and to the left of its line, so it cannot be read as
+        # part of the cost column's heading.
+        (ceiling, MUTED, f"best possible — {ceiling:.0%}",
+         "right", ceiling - 0.005, top - 0.52),
+    ):
+        ax.axvline(value, ls="--", lw=1.6, color=colour, alpha=0.9, zorder=1)
+        ax.text(x, y, text, fontsize=11.5, color=colour,
+                ha=ha, va="bottom", linespacing=1.35)
 
-    stacked = [p for p in operating if "voting" in p[0] and p[1] > 0]
-    plain = [p for p in operating if "voting" not in p[0] and p[1] > 0]
-    free = [p for p in operating if p[1] == 0]
+    # --- the dumbbells ---------------------------------------------------
+    for y, (plain, stacked, label) in enumerate(ordered):
+        x_before, x_after = data[plain][1], data[stacked][1]
+        gained = data[stacked][2] - data[plain][2]
+        assert gained == 42, f"{stacked}: expected +42 answers, got {gained}"
 
-    fig, ax = plt.subplots(figsize=(9.5, 6))
+        ax.plot([x_before, x_after], [y, y], "-", lw=3.0, color=BEFORE,
+                alpha=0.55, zorder=2, solid_capstyle="round")
+        ax.plot(x_before, y, "o", ms=12, color=BEFORE, zorder=3,
+                mec="white", mew=2.0)
+        ax.plot(x_after, y, "o", ms=13, color=AFTER, zorder=4,
+                mec="white", mew=2.0)
 
-    # Zoom to the band the results actually occupy. Anchoring at 0 would spend
-    # four fifths of the panel on empty space and squeeze a 4.9-point effect
-    # into something the eye reads as no difference.
-    lo = min(p[2] for p in operating) - 0.025
-    hi = (ceiling[1] if ceiling else max(p[2] for p in operating)) + 0.022
-    ax.set_ylim(lo, hi)
-    xmax = max(p[1] for p in operating) * 1.30
-    ax.set_xlim(-22, xmax)
+        # Cost, as a column rather than a second axis.
+        ax.text(0.762, y, f"{data[stacked][0]:,.0f}", fontsize=12, color=MUTED,
+                ha="right", va="center", fontfamily="DejaVu Sans")
 
-    if control:
-        # Everything under this line paid cloud tokens for nothing.
-        ax.axhspan(lo, control[1], color="#c1440e", alpha=0.055, zorder=0)
+    ax.set_yticks(range(len(ordered)))
+    ax.set_yticklabels([r[2] for r in ordered], fontsize=12.5)
 
-    def rule(value, style, colour, text, weight="normal"):
-        # Parked in the empty mid-band. The right edge holds the arm cluster
-        # and the left edge the free markers, so a label at either end lands
-        # on top of a data point.
-        ax.axhline(value, ls=style, lw=1.4, color=colour, zorder=1)
-        ax.text(xmax * 0.28, value + (hi - lo) * 0.010, text, fontsize=9,
-                color=colour, ha="center", fontweight=weight,
-                bbox=dict(facecolor="white", edgecolor="none", pad=1.6, alpha=0.85))
+    # Direct-label only the row that matters.
+    best_y = len(ordered) - 1
+    ax.annotate(f"{data['BEST-qwen9b + voting'][1]:.0%}",
+                xy=(data["BEST-qwen9b + voting"][1], best_y),
+                xytext=(11, 0), textcoords="offset points",
+                fontsize=13, fontweight="bold", color=AFTER, va="center")
 
-    if ceiling:
-        rule(ceiling[1], ":", "#555555", f"pass@3 ceiling  {ceiling[1]:.1%}")
-    if control:
-        rule(control[1], "--", "#c1440e",
-             f"free control: self-consistency@3  {control[1]:.1%}", "bold")
-    if local:
-        rule(local[1], "-", "#9a9a9a", f"fine-tuned model alone  {local[1]:.1%}")
+    # --- axes -------------------------------------------------------------
+    ax.set_xlim(0.54, 0.775)
+    ax.set_ylim(-0.7, len(ordered) + 1.15)
+    ax.set_xticks([0.55, 0.60, 0.65, 0.70, 0.75])
+    ax.xaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
+    ax.set_xlabel("Share of the 1,319 maths questions answered correctly", fontsize=13)
+    ax.text(0.762, len(ordered) + 0.18, "off-device\nwords",
+            fontsize=11.5, color=MUTED, ha="right", va="bottom", linespacing=1.35)
 
-    frontier = pareto_frontier(operating)
-    ax.plot([p[1] for p in frontier], [p[2] for p in frontier],
-            "-", lw=1.6, color="#1f4e79", alpha=0.5, zorder=2,
-            label="Pareto frontier")
+    ax.grid(axis="x", alpha=0.18, lw=0.8)
+    ax.set_axisbelow(True)
+    for side in ("top", "right", "left"):
+        ax.spines[side].set_visible(False)
+    ax.spines["bottom"].set_color("#cfcfcf")
+    ax.tick_params(axis="y", length=0)
 
-    ax.scatter([p[1] for p in free], [p[2] for p in free], s=120, marker="s",
-               facecolors="#c1440e", edgecolors="#7a2b09", zorder=4,
-               label="free, on-device only")
-    ax.scatter([p[1] for p in plain], [p[2] for p in plain], s=115, marker="o",
-               facecolors="white", edgecolors="#1f4e79", linewidths=1.8, zorder=4,
-               label="cascade run instead of voting")
-    ax.scatter([p[1] for p in stacked], [p[2] for p in stacked], s=125, marker="o",
-               facecolors="#1f4e79", edgecolors="#12324d", zorder=5,
-               label="cascade stacked on voting")
+    legend = [
+        Line2D([], [], marker="o", ls="", ms=12, color=BEFORE, mec="white", mew=2.0,
+               label="checker used instead of the majority vote"),
+        Line2D([], [], marker="o", ls="", ms=13, color=AFTER, mec="white", mew=2.0,
+               label="checker used as well as it  (+42 answers, same cost)"),
+    ]
+    # Below the axis: inside, the legend landed on the bottom row's dumbbell.
+    fig.legend(handles=legend, loc="lower center", ncol=1, fontsize=11.5,
+               frameon=False, handletextpad=0.6, labelspacing=0.45,
+               bbox_to_anchor=(0.56, -0.008))
 
-    # L0/L1/L2 sit within 5 tokens of each other on x, so labels cannot go to
-    # the side without overprinting the neighbouring arm. Splitting them by
-    # family instead -- stacked above, plain below -- keeps the two clusters
-    # apart, which is also the comparison the reader is here to make.
-    for label, cost, accuracy in operating:
-        stacked_arm = "voting" in label
-        if cost == 0:
-            # Named by its own reference line, which also carries the figure.
-            # Annotating the marker too just prints the phrase twice.
-            continue
-        elif cost < 340:
-            # The six arms share x to within 5 tokens but are well separated on
-            # y, so a single label column in the empty mid-band reads cleanly
-            # where per-point offsets collide.
-            ax.annotate(label, (cost, accuracy), textcoords="offset points",
-                        xytext=(-14, -3.5), fontsize=8.5, ha="right",
-                        color="#12324d",
-                        fontweight="bold" if stacked_arm else "normal")
-        else:
-            ax.annotate(label, (cost, accuracy), textcoords="offset points",
-                        xytext=(14, -3.5), fontsize=8.5, ha="left",
-                        color="#12324d",
-                        fontweight="bold" if stacked_arm else "normal")
-
-    ax.set_xlabel("Cloud tokens per question   (0 = nothing leaves the device)")
-    ax.set_ylabel("GSM8K exact-answer accuracy")
-    ax.set_title(
-        "Accuracy vs. cloud cost: gemma-4-E2B-it with a GLM-4.7-Flash supervisor\n"
-        "1,319 GSM8K test questions. Hollow points are off the frontier - "
-        "no deployer would choose them.",
-        fontsize=10.5, linespacing=1.4)
-    ax.grid(alpha=0.25, lw=0.6)
-    ax.legend(loc="lower right", fontsize=9, framealpha=0.96)
-    fig.tight_layout()
-
-    out = Path(args.output)
+    fig.subplots_adjust(left=0.225, right=0.975, top=0.855, bottom=0.30)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=200)
     fig.savefig(out.with_suffix(".pdf"))
-    print(f"Wrote {out} and {out.with_suffix('.pdf')}")
-    print("\nPareto frontier (what a deployer would actually choose):")
-    for label, cost, accuracy in frontier:
-        print(f"  {cost:7.1f} tokens/q   {accuracy:.4f}   {label}")
+    print(f"wrote {out} and {out.with_suffix('.pdf')}")
+
+
+def main_cli() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--summary", type=Path,
+                        default=REPO / "reports" / "fydp3_summary.csv")
+    parser.add_argument("--output", type=Path,
+                        default=REPO / "reports" / "figures" / "pareto.png")
+    args = parser.parse_args()
+    draw(load(args.summary), args.output)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main_cli())

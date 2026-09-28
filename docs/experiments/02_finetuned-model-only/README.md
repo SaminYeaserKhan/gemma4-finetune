@@ -48,7 +48,7 @@ flowchart TB
         SOLVER --> ONE
     end
     ONE --> OUT["<b>The answer you see</b>"]
-    style DEV fill:#e8f4ea,stroke:#2d6a4f,stroke-width:2px
+    style DEV fill:#eaf7ff,stroke:#46bbfe,stroke-width:2px
 ```
 
 ```mermaid
@@ -57,7 +57,7 @@ flowchart TD
     Q --> A["The small AI answers once"]
     A --> RES
     RES["<b>737 right</b> (55.9%)<br/>582 wrong"]
-    style RES fill:#e6eefc,stroke:#2b4c8c,stroke-width:2px
+    style RES fill:#86e5a1,stroke:#009d25,stroke-width:2px
 ```
 
 </details>

@@ -97,10 +97,22 @@ def mermaid_command() -> list[str]:
     return [npx, "-y", "@mermaid-js/mermaid-cli"]
 
 
+THEME = REPO / "scripts" / "mermaid_theme.json"
+STYLE = REPO / "scripts" / "mermaid_style.css"
+
+
 def render(base: list[str], source: Path, target: Path, scale: int | None) -> None:
     # A transparent background turns into black boxes when pasted into Word, so the
     # background is forced white rather than left to the default.
     cmd = [*base, "-i", str(source), "-o", str(target), "-b", "white"]
+    # The theme carries the palette and the font size; the CSS carries the rounded
+    # corners, which Mermaid exposes no theme variable for -- node shape is
+    # otherwise fixed by the source syntax, and rewriting every node in every
+    # diagram to a rounded form would be a far larger change for the same result.
+    if THEME.exists():
+        cmd += ["-c", str(THEME)]
+    if STYLE.exists():
+        cmd += ["-C", str(STYLE)]
     if scale:
         cmd += ["-s", str(scale)]
     result = subprocess.run(cmd, capture_output=True, text=True)

@@ -64,9 +64,9 @@ flowchart TB
     CHECK -->|"verdict + one-sentence hint<br/>(never the answer)"| SOLVER
     VOTE --> OUT["<b>Answer shown to the user</b><br/>always written by the local solver"]
 
-    style DEV fill:#e8f4ea,stroke:#2d6a4f,stroke-width:2px
-    style OFF fill:#fdf0e6,stroke:#b5651d,stroke-width:2px
-    style OUT fill:#e6eefc,stroke:#2b4c8c,stroke-width:2px
+    style DEV fill:#eaf7ff,stroke:#46bbfe,stroke-width:2px
+    style OFF fill:#fff2e3,stroke:#f0a04b,stroke-width:2px
+    style OUT fill:#86e5a1,stroke:#009d25,stroke-width:2px
 ```
 
 **The point of this figure:** everything expensive is inside the green box. The orange
@@ -104,9 +104,9 @@ flowchart TD
     RETRY --> FINAL["<b>Final answer</b>"]
     KEEP --> FINAL
 
-    style KEEP fill:#e8f4ea,stroke:#2d6a4f
-    style JUDGE fill:#fdf0e6,stroke:#b5651d
-    style FINAL fill:#e6eefc,stroke:#2b4c8c,stroke-width:2px
+    style KEEP fill:#eaf7ff,stroke:#46bbfe
+    style JUDGE fill:#fff2e3,stroke:#f0a04b
+    style FINAL fill:#86e5a1,stroke:#009d25,stroke-width:2px
 ```
 
 **Two things to say about this figure in the text:**
@@ -130,7 +130,7 @@ flowchart TD
 > which is why every un-stacked arm failed to beat self-consistency.
 
 ```mermaid
-flowchart LR
+flowchart TB
     W["<b>A question the<br/>model got wrong</b>"] --> T{"Why was it wrong?"}
 
     T -->|"It knew how to do it,<br/>but this attempt<br/>was unlucky"| A["Other attempts got it right"]
@@ -142,9 +142,9 @@ flowchart LR
     AV --> R["<b>Use both, layered</b><br/>vote first, escalate only<br/>the split votes<br/><br/>0.5944 → 0.6262 at<br/>identical cloud cost"]
     BV --> R
 
-    style AV fill:#e8f4ea,stroke:#2d6a4f
-    style BV fill:#fdf0e6,stroke:#b5651d
-    style R fill:#e6eefc,stroke:#2b4c8c,stroke-width:2px
+    style AV fill:#eaf7ff,stroke:#46bbfe
+    style BV fill:#fff2e3,stroke:#f0a04b
+    style R fill:#86e5a1,stroke:#009d25,stroke-width:2px
 ```
 
 **Say in the text:** run *instead of* the vote, no arm was statistically
@@ -177,8 +177,8 @@ flowchart TD
     G1 -.->|"never escalated<br/>while harder ones remain"| PICK
     G2 -.-> PICK
 
-    style G3 fill:#fdf0e6,stroke:#b5651d
-    style PICK fill:#e6eefc,stroke:#2b4c8c,stroke-width:2px
+    style G3 fill:#fff2e3,stroke:#f0a04b
+    style PICK fill:#86e5a1,stroke:#009d25,stroke-width:2px
 ```
 
 **Why this design:** a 3-sample disagreement signal has only three possible values, so
@@ -215,9 +215,9 @@ flowchart TD
     SUP -->|"15_pipeline_qwen9b_BEST_RESULT"| AN["<b>analyze_supervision.py</b><br/>gate curves, confusion matrix,<br/>flip matrix, McNemar test"]
     AN --> REP[("reports/<br/>tables + figures")]
 
-    style TRAIN fill:#e8f4ea,stroke:#2d6a4f
-    style SUP fill:#e6eefc,stroke:#2b4c8c,stroke-width:2px
-    style SERVE fill:#fdf0e6,stroke:#b5651d
+    style TRAIN fill:#eaf7ff,stroke:#46bbfe
+    style SUP fill:#86e5a1,stroke:#009d25,stroke-width:2px
+    style SERVE fill:#fff2e3,stroke:#f0a04b
 ```
 
 ---
@@ -232,7 +232,7 @@ flowchart TD
 > rejections worse. Bigger is not uniformly better.
 
 ```mermaid
-flowchart LR
+flowchart TB
     L1["<b>2B — the solver<br/>checking itself</b><br/>approves almost everything<br/>catches 22% of errors"]
     L2["<b>9B checker</b><br/>catches 89% of errors<br/>wrongly rejects 18.6%<br/><b>best overall, and 1.8x faster</b>"]
     L3["<b>30B checker</b><br/>catches more still, but<br/>wrongly rejects 25.5%"]
@@ -242,9 +242,9 @@ flowchart LR
     L2 -->|"<b>gets worse</b>"| L3
     L3 -.->|"reference only"| L4
 
-    style L2 fill:#e8f4ea,stroke:#2d6a4f,stroke-width:2px
-    style L3 fill:#fdece9,stroke:#b03a2e
-    style L4 fill:#eeeeee,stroke:#888,stroke-dasharray: 4 4
+    style L2 fill:#eaf7ff,stroke:#46bbfe,stroke-width:2px
+    style L3 fill:#ffd9d4,stroke:#e06a5a
+    style L4 fill:#f2f2f2,stroke:#9a9a9a,stroke-dasharray: 4 4
 ```
 
 **The sentence this figure exists to support:** *there is a checker size that fits the
