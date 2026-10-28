@@ -9,6 +9,40 @@ shown the correct answer.
 (1,319 questions): the untrained base model, the same model after fine-tuning, and the
 full cascade. Every model, verifier included, runs locally — no cloud service was used.
 
+![Accuracy of each supervised cascade on GSM8K: the checker used instead of majority voting versus stacked on top of it. The 9B checker stacked on voting reaches 68%.](reports/figures/pareto.png)
+
+## Results at a glance
+
+| System | GSM8K accuracy (all 1,319 test questions) | Questions sent off-device |
+|---|---|---|
+| Gemma-4-E2B, untrained | 36.32% | none |
+| After QLoRA fine-tuning | 55.88% | none |
+| Fine-tuned, majority vote of 3 attempts | 59.06% | none |
+| **Full cascade: vote + on-device gate + 9B verifier with hint** | **68.46%** | **30%** |
+| Upper limit: any of the 3 attempts correct | 72.93% | — |
+
+Two findings matter most. The cascade only beats free majority voting when it is stacked
+on top of it, and a 9B verifier beat a 30B one on precision, recall and speed.
+
+## How the cascade works
+
+```mermaid
+flowchart LR
+    Q[Maths question] --> S["Fine-tuned Gemma-4-E2B<br/>answers 3 times on the device"]
+    S --> G{"On-device gate:<br/>is this one hard?"}
+    G -- "easy, about 70%" --> A[Majority answer]
+    G -- "hard, about 30%" --> V["Local verifier LLM (llama.cpp)<br/>checks the reasoning,<br/>never sees the answer key"]
+    V -- accepted --> A
+    V -- "rejected, with a hint" --> R[Small model retries with the hint]
+    R --> A
+```
+
+## Team
+
+A final year design project (FYDP) at United International University, Dhaka, by a team of
+five. [Samin Yeaser Khan](https://github.com/SaminYeaserKhan) led the data preparation, model
+training and system design; teammates led the paper write-up.
+
 > **New here, or writing the thesis paper?** Start with
 > **[`docs/PAPER_GUIDE.md`](docs/PAPER_GUIDE.md)** — what was built, every result and
 > what it means, a glossary, and the questions to expect at the defence, all in
@@ -34,9 +68,9 @@ optional providers but were not used for any headline number.
 - `supervise.py`: runs supervised retry evaluation with up to two retries by default.
 - `thesis_pipeline/`: shared config, prompt formatting, answer extraction, model loading, and supervisor clients.
 
-Ignored by git: `venv/`, `gsm8k_formatted/`, `checkpoints/`, and `gemma4-gsm8k-final/` —
-the environment, the formatted dataset and the model weights, all reproducible from the
-scripts. **Results are committed**: `outputs/predictions/` holds every prediction file and
+The trained LoRA adapter (`gemma4-gsm8k-final/`) and the formatted dataset
+(`gsm8k_formatted/`) are committed; `venv/`, `checkpoints/` and the dataset's cache files are
+not, and all of them can be rebuilt from the scripts. **Results are committed**: `outputs/predictions/` holds every prediction file and
 `reports/` the tables and figures, so the numbers can be checked without re-running
 anything.
 
@@ -57,8 +91,6 @@ $env:HUGGINGFACE_TOKEN="hf_..."
 $env:OPENAI_API_KEY="sk_..."
 $env:ANTHROPIC_API_KEY="sk-ant-..."
 ```
-
-The existing `Hugging face tokken.txt` file is ignored now. Revoke or remove it if it contains a real token.
 
 ## Data
 
@@ -83,7 +115,7 @@ This factuality metric is a conservative lexical proxy, not the main thesis resu
 
 ## Training
 
-The current checkpoint is incomplete, so the default command resumes from the newest `checkpoints/checkpoint-*` directory.
+By default, `train.py` resumes from the newest `checkpoints/checkpoint-*` directory if one exists, and otherwise starts a fresh run.
 
 ```powershell
 python train.py
